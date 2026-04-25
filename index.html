@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Градски Транспорт - Сигнали</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; background: #f5f5f5; min-height: 100vh; }
+        
+        header {
+            background: #2563eb;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 15px;
+            background: #1d4ed8;
+            flex-wrap: wrap;
+        }
+        
+        nav button {
+            padding: 12px 20px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 20px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        nav button.active {
+            background: white;
+            color: #2563eb;
+            font-weight: bold;
+        }
+        
+        main {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .section { display: none; }
+        .section.active { display: block; }
+        
+        .form-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .form-card h3 {
+            color: #2563eb;
+            margin-bottom: 15px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .item-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #2563eb;
+        }
+        
+        .item-card.found { border-left-color: #10b981; }
+        .item-card.lost { border-left-color: #f59e0b; }
+        
+        .item-card h4 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .item-card p {
+            color: #666;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        .status-badge.found { background: #dbeafe; color: #1e40af; }
+        .status-badge.lost { background: #fef3c7; color: #92400e; }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #10b981;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-weight: 500;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🚌 Градски Транспорт</h1>
+    </header>
+    
+    <nav>
+        <button class="active" onclick="showTab('complaint')">📝 Сигнал</button>
+        <button onclick="showTab('lost')">🔍 Изгубено</button>
+        <button onclick="showTab('found')">🎯 Намерено</button>
+    </nav>
+
+    <main>
+        <div id="complaint-section" class="section active">
+            <div class="form-card">
+                <h3>📝 Подай сигнал за проблем</h3>
+                <form id="complaint-form" onsubmit="submitComplaint(event)">
+                    <div class="form-group">
+                        <label>Категория:</label>
+                        <select id="category" required>
+                            <option value="">-- Избери --</option>
+                            <option value="chistota">🧹 Чистота</option>
+                            <option value="povedenie">👤 Поведение</option>
+                            <option value="zakuclene">🚪 Закъснение</option>
+                            <option value="tehnichesko">🔧 Техническо</option>
+                            <option value="bezopasnost">⚠️ Безопасност</option>
+                            <option value="drug">❓ Друго</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Номер на автобус:</label>
+                        <input type="text" id="bus-number" placeholder=" напр. 285" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Линия:</label>
+                        <input type="text" id="line" placeholder="Автобус 285" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Дата и час:</label>
+                        <input type="datetime-local" id="incident-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Описание:</label>
+                        <textarea id="description" rows="3" placeholder="Какво се случи?" required></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn">📨 Изпрати</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="lost-section" class="section">
+            <h3 style="margin-bottom: 15px;">🔍 Изгубени вещи</h3>
+            <div id="lost-list"></div>
+            
+            <div class="form-card" style="margin-top: 30px;">
+                <h3>🔍 Добави изгубена вещ</h3>
+                <form id="lost-form" onsubmit="submitLost(event)">
+                    <div class="form-group">
+                        <label>Какво загуби?</label>
+                        <input type="text" id="lost-desc" placeholder="Описание" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Линия:</label>
+                        <input type="text" id="lost-line" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Дата:</label>
+                        <input type="date" id="lost-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Телефон:</label>
+                        <input type="tel" id="lost-phone" placeholder="+359..." required>
+                    </div>
+                    <button type="submit" class="submit-btn">Добави</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="found-section" class="section">
+            <h3 style="margin-bottom: 15px;">🎯 Намерени вещи</h3>
+            <div id="found-list"></div>
+            
+            <div class="form-card" style="margin-top: 30px;">
+                <h3>🎯 Добави намерена вещ</h3>
+                <form id="found-form" onsubmit="submitFound(event)">
+                    <div class="form-group">
+                        <label>Какво намери?</label>
+                        <input type="text" id="found-desc" placeholder="Описание" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Линия:</label>
+                        <input type="text" id="found-line" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Дата:</label>
+                        <input type="date" id="found-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Твой телефон:</label>
+                        <input type="tel" id="found-phone" placeholder="+359..." required>
+                    </div>
+                    <button type="submit" class="submit-btn">Добави</button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        var items = [];
+
+        function loadData() {
+            var stored = localStorage.getItem('items');
+            items = stored ? JSON.parse(stored) : getDemoData();
+        }
+
+        function getDemoData() {
+            return [
+                {id: 1, type: 'found', desc: 'Черен портфейл', line: '285', date: '2026-04-25', phone: '+359888111222'},
+                {id: 2, type: 'found', desc: 'Син часовник', line: '11', date: '2026-04-24', phone: '+359887555666'},
+                {id: 3, type: 'lost', desc: 'Червени очила', line: '73', date: '2026-04-23', phone: '+359889999888'}
+            ];
+        }
+
+        function showTab(id) {
+            document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+            document.querySelectorAll('nav button').forEach(function(b) { b.classList.remove('active'); });
+            
+            document.getElementById(id + '-section').classList.add('active');
+            event.target.classList.add('active');
+            
+            if (id === 'lost') renderLost();
+            if (id === 'found') renderFound();
+        }
+
+        function renderLost() {
+            var list = document.getElementById('lost-list');
+            
+            // Show all items - both lost and found
+            var allItems = items.filter(function(i) { return i.type === 'found' || i.type === 'lost'; });
+            
+            if (allItems.length === 0) {
+                list.innerHTML = '<div class="empty-state">Няма записи</div>';
+                return;
+            }
+            
+            var html = '';
+            allItems.forEach(function(item) {
+                var isFound = item.type === 'found';
+                html += '<div class="item-card ' + (isFound ? 'found' : 'lost') + '">';
+                html += '<h4>' + item.desc + '</h4>';
+                html += '<p>📍 ' + item.line + '</p>';
+                html += '<p>📅 ' + item.date + '</p>';
+                if (isFound) {
+                    html += '<button class="submit-btn" style="margin-top:10px;background:#10b981;" onclick="callPhone(\'' + item.phone + '\')">📞 ' + item.phone + '</button>';
+                    html += '<span class="status-badge found">🎯 Намерено</span>';
+                } else {
+                    html += '<span class="status-badge lost">🔍 Търси се</span>';
+                }
+                html += '</div>';
+            });
+            list.innerHTML = html;
+        }
+
+        function renderFound() {
+            var list = document.getElementById('found-list');
+            var foundItems = items.filter(function(i) { return i.type === 'found'; });
+            
+            if (foundItems.length === 0) {
+                list.innerHTML = '<div class="empty-state">Няма намерени вещи</div>';
+                return;
+            }
+            
+            var html = '';
+            foundItems.forEach(function(item) {
+                html += '<div class="item-card found">';
+                html += '<h4>' + item.desc + '</h4>';
+                html += '<p>📍 ' + item.line + '</p>';
+                html += '<p>📅 ' + item.date + '</p>';
+                html += '<button class="submit-btn" style="margin-top:10px;background:#10b981;" onclick="callPhone(\'' + item.phone + '\')">📞 ' + item.phone + '</button>';
+                html += '<span class="status-badge found">🎯 Намерено</span>';
+                html += '</div>';
+            });
+            list.innerHTML = html;
+        }
+
+        function callPhone(phone) {
+            window.location.href = 'tel:' + phone;
+        }
+
+        function submitComplaint(e) {
+            e.preventDefault();
+            showToast('Сигналът е изпратен!');
+            document.getElementById('complaint-form').reset();
+        }
+
+        function submitLost(e) {
+            e.preventDefault();
+            var item = {
+                id: Date.now(),
+                type: 'lost',
+                desc: document.getElementById('lost-desc').value,
+                line: document.getElementById('lost-line').value,
+                date: document.getElementById('lost-date').value,
+                phone: document.getElementById('lost-phone').value
+            };
+            items.unshift(item);
+            saveData();
+            document.getElementById('lost-form').reset();
+            renderLost();
+            showToast('Добавено!');
+        }
+
+        function submitFound(e) {
+            e.preventDefault();
+            var item = {
+                id: Date.now(),
+                type: 'found',
+                desc: document.getElementById('found-desc').value,
+                line: document.getElementById('found-line').value,
+                date: document.getElementById('found-date').value,
+                phone: document.getElementById('found-phone').value
+            };
+            items.unshift(item);
+            saveData();
+            document.getElementById('found-form').reset();
+            renderLost();
+            showToast('Добавено! Ще се покаже в Изгубено.');
+        }
+
+        function saveData() {
+            localStorage.setItem('items', JSON.stringify(items));
+        }
+
+        function showToast(msg) {
+            var toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(function() { toast.remove(); }, 3000);
+        }
+
+        loadData();
+    </script>
+</body>
+</html>

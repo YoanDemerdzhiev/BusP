@@ -4,6 +4,7 @@ export interface User {
   password: string;
   firstName: string;
   lastName: string;
+  role: 'user' | 'admin';
   createdAt: string;
 }
 
@@ -62,6 +63,31 @@ export interface Database {
   problems: Problem[];
   lostItems: LostItem[];
   foundItems: FoundItem[];
+  resolvedReports: ResolvedReport[];
+}
+
+export interface ResolvedReport {
+  id: string;
+  originalId: string;
+  type: 'problem' | 'lost' | 'found';
+  title: string;
+  itemName?: string;
+  description: string;
+  busLine: string;
+  busRegistration: string;
+  date: string;
+  time: string;
+  location: string;
+  photoUrl: string | null;
+  isAnonymous: boolean;
+  reporterName?: string;
+  reporterPhone?: string;
+  reporterEmail?: string;
+  finderName?: string;
+  finderPhone?: string;
+  status: string;
+  resolvedAt: string;
+  resolvedBy: string;
 }
 
 export const BUS_LINES_PLOVDIV = [

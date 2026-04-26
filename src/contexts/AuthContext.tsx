@@ -57,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       firstName,
       lastName,
+      role: 'user',
       createdAt: new Date().toISOString(),
     };
     

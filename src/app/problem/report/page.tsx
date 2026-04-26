@@ -113,7 +113,7 @@ function ReportForm() {
 
   return (
     <PhoneFrame>
-      <Header title={`Проблем - ${busLine}`} showBack />
+      <Header title="Създай сигнал" showBack />
       
       <form onSubmit={handleSubmit} className="flex-1 p-4 overflow-y-auto pb-20 space-y-4">
         <div>

@@ -43,8 +43,6 @@ The Passenger App provides a smartphone-optimized interface where users can repo
 
 The Transport Dashboard gives transport companies access to real-time incident feeds, allowing them to manage and update the status of reports, view analytics on incident trends, maintain a centralized lost-and-found registry, and export reports for management review.
 
-The Driver Portal enables bus drivers to quickly log incidents they encounter during their routes, with automatic GPS capture of location data and pre-filled driver information.
-
 ---
 
 ## 3. Market Analysis
@@ -188,7 +186,7 @@ BusP is positioned as a platform for **urban transformation**, not a complaint a
 
 ### 6.3 Product Features
 
-- **Signal 360°:** Verified reports with photos and GPS evidence, providing transparent incident documentation
+- **Signal 360°:** Verified reports with photos, providing transparent incident documentation
 - **Lost & Found:** Trust-building system that reconnects citizens with their belongings
 
 ### 6.4 User Journey

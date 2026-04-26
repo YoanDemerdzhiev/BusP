@@ -93,6 +93,7 @@ export default function FoundPage() {
       <PhoneFrame>
         <Header 
           title="Намерено" 
+          showBack
           onMenuClick={() => setMenuOpen(true)}
         />
         

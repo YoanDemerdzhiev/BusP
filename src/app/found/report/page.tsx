@@ -2,29 +2,32 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Upload, Camera, CheckCircle } from 'lucide-react';
+import { Camera, CheckCircle } from 'lucide-react';
 import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
-import { createProblem } from '@/lib/data';
-import { Problem } from '@/lib/types';
+import { BUS_LINES_PLOVDIV } from '@/lib/types';
+import { createFoundItem } from '@/lib/data';
+import { FoundItem } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
 function ReportForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const busLine = searchParams.get('line') || '';
   const { user } = useAuth();
+  const busLineParam = searchParams.get('line') || '';
+  const busLineInfo = BUS_LINES_PLOVDIV.find(l => l.line === busLineParam);
 
-  const [title, setTitle] = useState('');
+  const [itemName, setItemName] = useState('');
   const [busRegistration, setBusRegistration] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
-  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [finderName, setFinderName] = useState(user?.firstName + ' ' + user?.lastName || '');
+  const [finderPhone, setFinderPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -44,36 +47,37 @@ function ReportForm() {
     e.preventDefault();
     setError('');
 
-    if (!title || !date || !location) {
+    if (!itemName || !date || !location || !finderPhone) {
       setError('Моля, попълнете задължителните полета');
       return;
     }
 
     setIsSubmitting(true);
 
-    const problem: Problem = {
+    const item: FoundItem = {
       id: uuidv4(),
-      userId: isAnonymous ? null : user?.id || null,
-      title,
-      busLine,
+      userId: user?.id || '',
+      itemName,
+      busLine: busLineParam || 'N/A',
       busRegistration,
       date,
       time,
       location,
       description,
       photoUrl: photo,
-      isAnonymous,
-      status: 'new',
+      finderName,
+      finderPhone,
+      status: 'active',
       createdAt: new Date().toISOString(),
     };
 
     setTimeout(() => {
-      createProblem(problem);
+      createFoundItem(item);
       setSuccess(true);
       setIsSubmitting(false);
       
       setTimeout(() => {
-        router.push('/home');
+        router.push('/found');
       }, 2000);
     }, 1000);
   };
@@ -90,7 +94,7 @@ function ReportForm() {
             Сигналът е изпратен!
           </h2>
           <p className="text-slate-500 dark:text-slate-400 text-center mb-8">
-            Благодарим ви за сигнала. Ще се свържем с вас скоро.
+            Благодарим ви! Ще се свържем с вас, ако собственикът потърси предмета.
           </p>
           <div className="w-full space-y-3">
             <button
@@ -113,18 +117,24 @@ function ReportForm() {
 
   return (
     <PhoneFrame>
-      <Header title={`Проблем - ${busLine}`} showBack />
+      <Header title="Създай сигнал" showBack />
       
       <form onSubmit={handleSubmit} className="flex-1 p-4 overflow-y-auto pb-20 space-y-4">
+        <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
+          <p className="text-sm text-green-700 dark:text-green-300">
+            <strong>Автобус {busLineParam}</strong> {busLineInfo ? `- ${busLineInfo.route}` : ''}
+          </p>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Какво се случи *
+            Намерен предмет *
           </label>
           <input
             type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Кратко описание на проблема"
+            value={itemName}
+            onChange={(e) => setItemName(e.target.value)}
+            placeholder="Опишете предмета"
             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
           />
         </div>
@@ -175,7 +185,7 @@ function ReportForm() {
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="Къде се случи?"
+            placeholder="Къде намерихте предмета?"
             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
           />
         </div>
@@ -188,16 +198,16 @@ function ReportForm() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Подробно описание..."
-            rows={4}
+            rows={3}
             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 resize-none"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Качи снимка
+            Снимка
           </label>
-          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
+          <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
             {photo ? (
               <div className="relative w-full h-full">
                 <img src={photo} alt="Preview" className="w-full h-full object-cover rounded-xl" />
@@ -211,8 +221,8 @@ function ReportForm() {
               </div>
             ) : (
               <>
-                <Camera className="w-8 h-8 text-slate-400 mb-2" />
-                <span className="text-sm text-slate-500">Натиснете за да качите снимка</span>
+                <Camera className="w-6 h-6 text-slate-400 mb-1" />
+                <span className="text-xs text-slate-500">Прикачете снимка</span>
               </>
             )}
             <input
@@ -224,15 +234,34 @@ function ReportForm() {
           </label>
         </div>
 
-        <label className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isAnonymous}
-            onChange={(e) => setIsAnonymous(e.target.checked)}
-            className="w-5 h-5 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
-          />
-          <span className="text-slate-700 dark:text-slate-300">Анонимно подаване</span>
-        </label>
+        <div className="border-t border-slate-200 dark:border-slate-600 pt-4 space-y-4">
+          <h3 className="font-medium text-slate-700 dark:text-slate-300">Ваши данни за контакт</h3>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Име *
+            </label>
+            <input
+              type="text"
+              value={finderName}
+              onChange={(e) => setFinderName(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Телефонен номер *
+            </label>
+            <input
+              type="tel"
+              value={finderPhone}
+              onChange={(e) => setFinderPhone(e.target.value)}
+              placeholder="0888 123 456"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
+            />
+          </div>
+        </div>
 
         {error && (
           <p className="text-red-500 text-sm text-center">{error}</p>
@@ -241,7 +270,7 @@ function ReportForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-4 bg-red-500 text-white font-semibold rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50"
+          className="w-full py-4 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors disabled:opacity-50"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
@@ -249,7 +278,7 @@ function ReportForm() {
               Изпращане...
             </span>
           ) : (
-            'Изпрати сигнал'
+            'Изпрати'
           )}
         </button>
       </form>
@@ -257,13 +286,14 @@ function ReportForm() {
   );
 }
 
-export default function ProblemReportPage() {
+export default function FoundReportPage() {
   return (
     <ProtectedRoute>
       <Suspense fallback={
         <PhoneFrame>
+          <Header title="Създай сигнал" showBack />
           <div className="flex-1 flex items-center justify-center">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
           </div>
         </PhoneFrame>
       }>

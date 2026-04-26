@@ -94,6 +94,7 @@ export default function LostPage() {
       <PhoneFrame>
         <Header 
           title="Изгубено" 
+          showBack
           onMenuClick={() => setMenuOpen(true)}
         />
         

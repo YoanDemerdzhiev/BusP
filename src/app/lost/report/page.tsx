@@ -8,7 +8,7 @@ import Header from '@/components/Header';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { BUS_LINES_PLOVDIV } from '@/lib/types';
-import { createLostItem } from '@/lib/data';
+import { createLostItem } from '@/lib/db-supabase';
 import { LostItem } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -71,15 +71,18 @@ function ReportForm() {
       createdAt: new Date().toISOString(),
     };
 
-    setTimeout(() => {
-      createLostItem(item);
+    try {
+      await createLostItem(item);
       setSuccess(true);
       setIsSubmitting(false);
       
       setTimeout(() => {
         router.push('/lost');
       }, 2000);
-    }, 1000);
+    } catch (err) {
+      setError('Грешка при запазване на сигнала');
+      setIsSubmitting(false);
+    }
   };
 
   if (success) {

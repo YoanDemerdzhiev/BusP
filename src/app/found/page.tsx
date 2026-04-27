@@ -8,7 +8,7 @@ import Header from '@/components/Header';
 import NavMenu from '@/components/NavMenu';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { LostItem } from '@/lib/types';
-import { getLostItems } from '@/lib/data';
+import { getLostItems } from '@/lib/db-supabase';
 
 export default function FoundPage() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -18,7 +18,11 @@ export default function FoundPage() {
   const router = useRouter();
 
   useEffect(() => {
-    setLostItems(getLostItems());
+    async function loadLostItems() {
+      const items = await getLostItems();
+      setLostItems(items);
+    }
+    loadLostItems();
   }, []);
 
   const filteredItems = lostItems.filter(item => 

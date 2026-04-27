@@ -88,24 +88,30 @@ export async function loginAdmin(email: string, password: string) {
 
 export async function getAllReports() {
   if (isConfigured && supabase) {
-    const { data, error } = await supabase
-      .from('reports')
+    const { data: problems, error: probError } = await supabase
+      .from('problems')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      throw new Error(error.message);
+    const { data: lostItems, error: lostError } = await supabase
+      .from('lost_items')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    const { data: foundItems, error: foundError } = await supabase
+      .from('found_items')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (probError || lostError || foundError) {
+      throw new Error(probError?.message || lostError?.message || foundError?.message);
     }
 
-    const reports = (data || []).map((r: any) => ({
-      ...r,
-      reportType: r.type,
-      itemName: r.title,
-      reporterName: r.contact_name,
-      reporterPhone: r.contact_phone,
-      finderName: r.contact_name,
-      finderPhone: r.contact_phone,
-    }));
+    const reports = [
+      ...(problems || []).map((r: any) => ({ ...r, reportType: 'problem', isAnonymous: r.is_anonymous })),
+      ...(lostItems || []).map((r: any) => ({ ...r, reportType: 'lost', isAnonymous: false })),
+      ...(foundItems || []).map((r: any) => ({ ...r, reportType: 'found', isAnonymous: false })),
+    ];
 
     return {
       reports,
@@ -159,23 +165,22 @@ export async function getBusLinesData() {
       .select('*')
       .order('line_number');
 
-    const { data: reports } = await supabase
-      .from('reports')
-      .select('*');
+    const { data: problems } = await supabase.from('problems').select('*');
+    const { data: lostItems } = await supabase.from('lost_items').select('*');
+    const { data: foundItems } = await supabase.from('found_items').select('*');
 
     const result = (busLines || []).map((line: any) => {
-      const lineReports = (reports || []).filter((r: any) => r.bus_line_id === line.id);
-      const problemCount = lineReports.filter((r: any) => r.type === 'problem').length;
-      const lostCount = lineReports.filter((r: any) => r.type === 'lost').length;
-      const foundCount = lineReports.filter((r: any) => r.type === 'found').length;
+      const lineProblems = (problems || []).filter((r: any) => r.bus_line_id === line.id);
+      const lineLost = (lostItems || []).filter((r: any) => r.bus_line_id === line.id);
+      const lineFound = (foundItems || []).filter((r: any) => r.bus_line_id === line.id);
 
       return {
         line: line.line_number,
         route: line.route_name,
-        totalReports: problemCount + lostCount + foundCount,
-        problems: problemCount,
-        lost: lostCount,
-        found: foundCount,
+        totalReports: lineProblems.length + lineLost.length + lineFound.length,
+        problems: lineProblems.length,
+        lost: lineLost.length,
+        found: lineFound.length,
       };
     });
 
@@ -210,8 +215,10 @@ export async function resolveReport(reportData: any) {
   if (isConfigured && supabase) {
     const { type, id } = reportData;
 
+    let tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
+
     const { data: original, error: fetchError } = await supabase
-      .from('reports')
+      .from(tableName)
       .select('*')
       .eq('id', id)
       .single();
@@ -224,7 +231,7 @@ export async function resolveReport(reportData: any) {
       .from('resolved_reports')
       .insert({
         original_id: original.id,
-        type: original.type,
+        type: type,
         title: original.title,
         description: original.description,
         bus_line_id: original.bus_line_id,
@@ -234,8 +241,8 @@ export async function resolveReport(reportData: any) {
         location: original.location,
         image_url: original.image_url,
         is_anonymous: original.is_anonymous,
-        contact_name: original.contact_name,
-        contact_phone: original.contact_phone,
+        contact_name: original.reporter_name || original.finder_name,
+        contact_phone: original.reporter_phone || original.finder_phone,
         resolved_at: new Date().toISOString(),
       });
 
@@ -244,7 +251,7 @@ export async function resolveReport(reportData: any) {
     }
 
     const { error: deleteError } = await supabase
-      .from('reports')
+      .from(tableName)
       .delete()
       .eq('id', id);
 
@@ -312,8 +319,10 @@ export async function resolveReport(reportData: any) {
 
 export async function deleteReport(reportId: string, type: string) {
   if (isConfigured && supabase) {
+    let tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
+
     const { error } = await supabase
-      .from('reports')
+      .from(tableName)
       .delete()
       .eq('id', reportId);
 

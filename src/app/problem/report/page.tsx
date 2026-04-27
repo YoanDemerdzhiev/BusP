@@ -7,7 +7,7 @@ import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
-import { createProblem } from '@/lib/data';
+import { createProblem } from '@/lib/db-supabase';
 import { Problem } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -67,15 +67,18 @@ function ReportForm() {
       createdAt: new Date().toISOString(),
     };
 
-    setTimeout(() => {
-      createProblem(problem);
+    try {
+      await createProblem(problem);
       setSuccess(true);
       setIsSubmitting(false);
       
       setTimeout(() => {
         router.push('/home');
       }, 2000);
-    }, 1000);
+    } catch (err) {
+      setError('Грешка при запазване на сигнала');
+      setIsSubmitting(false);
+    }
   };
 
   if (success) {

@@ -6,7 +6,7 @@ import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserReports } from '@/lib/data';
+import { getProblemsByUserId, getLostItemsByUserId, getFoundItemsByUserId } from '@/lib/db-supabase';
 import { Problem, LostItem, FoundItem } from '@/lib/types';
 
 type TabType = 'all' | 'problems' | 'lost' | 'found';
@@ -19,12 +19,19 @@ export default function ReportsPage() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user) {
-      const reports = getUserReports(user.id);
-      setProblems(reports.problems);
-      setLostItems(reports.lostItems);
-      setFoundItems(reports.foundItems);
+    async function loadReports() {
+      if (user) {
+        const [problemsData, lostData, foundData] = await Promise.all([
+          getProblemsByUserId(user.id),
+          getLostItemsByUserId(user.id),
+          getFoundItemsByUserId(user.id)
+        ]);
+        setProblems(problemsData);
+        setLostItems(lostData);
+        setFoundItems(foundData);
+      }
     }
+    loadReports();
   }, [user]);
 
   const tabs: { key: TabType; label: string; count: number }[] = [

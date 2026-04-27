@@ -69,7 +69,7 @@ export function toProblem(dbReport: DatabaseReport): Problem {
   };
 }
 
-export function toLostItem(dbReport: DatabaseReport): LostItem {
+export function toLostItem(dbReport: any): LostItem {
   return {
     id: dbReport.id,
     userId: dbReport.user_id || '',
@@ -81,14 +81,14 @@ export function toLostItem(dbReport: DatabaseReport): LostItem {
     location: dbReport.location,
     description: dbReport.description || '',
     photoUrl: dbReport.image_url,
-    reporterName: dbReport.contact_name || '',
-    reporterPhone: dbReport.contact_phone || '',
-    status: 'active',
+    reporterName: dbReport.reporter_name || '',
+    reporterPhone: dbReport.reporter_phone || '',
+    status: dbReport.status || 'active',
     createdAt: dbReport.created_at,
   };
 }
 
-export function toFoundItem(dbReport: DatabaseReport): FoundItem {
+export function toFoundItem(dbReport: any): FoundItem {
   return {
     id: dbReport.id,
     userId: dbReport.user_id || '',
@@ -100,9 +100,9 @@ export function toFoundItem(dbReport: DatabaseReport): FoundItem {
     location: dbReport.location,
     description: dbReport.description || '',
     photoUrl: dbReport.image_url,
-    finderName: dbReport.contact_name || '',
-    finderPhone: dbReport.contact_phone || '',
-    status: 'active',
+    finderName: dbReport.finder_name || '',
+    finderPhone: dbReport.finder_phone || '',
+    status: dbReport.status || 'active',
     createdAt: dbReport.created_at,
   };
 }
@@ -157,26 +157,29 @@ export async function verifyUser(email: string, password: string): Promise<User 
 
 export async function getProblems(): Promise<Problem[]> {
   if (!supabase) return [];
-  const { data } = await supabase.from('reports').select('*').eq('type', 'problem');
+  const { data } = await supabase.from('problems').select('*').order('created_at', { ascending: false });
   return (data || []).map(toProblem);
 }
 
 export async function getProblemsByUserId(userId: string): Promise<Problem[]> {
   if (!supabase) return [];
-  const { data } = await supabase.from('reports').select('*').eq('type', 'problem').eq('user_id', userId);
+  const { data } = await supabase.from('problems').select('*').eq('user_id', userId).order('created_at', { ascending: false });
   return (data || []).map(toProblem);
 }
 
 export async function getPublicProblems(): Promise<Problem[]> {
   if (!supabase) return [];
-  const { data } = await supabase.from('reports').select('*').eq('type', 'problem').eq('is_anonymous', true);
+  const { data } = await supabase.from('problems').select('*').eq('is_anonymous', true);
   return (data || []).map(toProblem);
 }
 
 export async function createProblem(problem: Problem): Promise<Problem> {
-  if (!supabase) throw new Error('Supabase not configured');
-  const { data } = await supabase.from('reports').insert({
-    type: 'problem',
+  if (!supabase) {
+    console.error('Supabase not configured');
+    throw new Error('Supabase not configured');
+  }
+  
+  const insertData = {
     title: problem.title,
     description: problem.description,
     bus_line_id: problem.busLine ? parseInt(problem.busLine) : null,
@@ -187,10 +190,28 @@ export async function createProblem(problem: Problem): Promise<Problem> {
     image_url: problem.photoUrl,
     is_anonymous: problem.isAnonymous,
     status: problem.status,
-    user_id: problem.isAnonymous ? null : problem.userId,
+    user_id: problem.isAnonymous ? null : (problem.userId || null),
     created_at: problem.createdAt,
-  }).select().single();
-  return toProblem(data as DatabaseReport);
+  };
+  
+  console.log('Inserting into problems:', insertData);
+  
+  const { data, error } = await supabase
+    .from('problems')
+    .insert(insertData)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Supabase insert error:', error);
+    throw new Error(error.message);
+  }
+  
+  if (!data) {
+    throw new Error('No data returned from insert');
+  }
+  
+  return toProblem(data);
 }
 
 export async function updateProblem(id: string, updates: Partial<Problem>): Promise<Problem | undefined> {
@@ -200,42 +221,62 @@ export async function updateProblem(id: string, updates: Partial<Problem>): Prom
   if (updates.description) updateData.description = updates.description;
   if (updates.status) updateData.status = updates.status;
   
-  const { data } = await supabase.from('reports').update(updateData).eq('id', id).select().single();
-  return data ? toProblem(data as DatabaseReport) : undefined;
+  const { data } = await supabase.from('problems').update(updateData).eq('id', id).select().single();
+  return data ? toProblem(data as any) : undefined;
 }
 
 export async function getLostItems(): Promise<LostItem[]> {
   if (!supabase) return [];
-  const { data } = await supabase.from('reports').select('*').eq('type', 'lost');
+  const { data } = await supabase.from('lost_items').select('*').order('created_at', { ascending: false });
   return (data || []).map(toLostItem);
 }
 
 export async function getLostItemsByUserId(userId: string): Promise<LostItem[]> {
   if (!supabase) return [];
-  const { data } = await supabase.from('reports').select('*').eq('type', 'lost').eq('user_id', userId);
+  const { data } = await supabase.from('lost_items').select('*').eq('user_id', userId).order('created_at', { ascending: false });
   return (data || []).map(toLostItem);
 }
 
 export async function createLostItem(item: LostItem): Promise<LostItem> {
-  if (!supabase) throw new Error('Supabase not configured');
-  const { data } = await supabase.from('reports').insert({
-    type: 'lost',
+  if (!supabase) {
+    console.error('Supabase not configured');
+    throw new Error('Supabase not configured');
+  }
+  
+  const insertData = {
     title: item.itemName,
     description: item.description,
-    bus_line_id: item.busLine ? parseInt(item.busLine) : null,
+    bus_line_id: item.busLine && item.busLine !== 'N/A' ? parseInt(item.busLine) : null,
     bus_registration: item.busRegistration,
     date: item.date,
     time: item.time,
     location: item.location,
     image_url: item.photoUrl,
-    is_anonymous: false,
     status: 'active',
-    user_id: item.userId,
-    contact_name: item.reporterName,
-    contact_phone: item.reporterPhone,
+    user_id: item.userId || null,
+    reporter_name: item.reporterName,
+    reporter_phone: item.reporterPhone,
     created_at: item.createdAt,
-  }).select().single();
-  return toLostItem(data as DatabaseReport);
+  };
+  
+  console.log('Inserting into lost_items:', insertData);
+  
+  const { data, error } = await supabase
+    .from('lost_items')
+    .insert(insertData)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Supabase insert error:', error);
+    throw new Error(error.message);
+  }
+  
+  if (!data) {
+    throw new Error('No data returned from insert');
+  }
+  
+  return toLostItem(data);
 }
 
 export async function updateLostItem(id: string, updates: Partial<LostItem>): Promise<LostItem | undefined> {
@@ -245,42 +286,62 @@ export async function updateLostItem(id: string, updates: Partial<LostItem>): Pr
   if (updates.description) updateData.description = updates.description;
   if (updates.status) updateData.status = updates.status;
   
-  const { data } = await supabase.from('reports').update(updateData).eq('id', id).select().single();
-  return data ? toLostItem(data as DatabaseReport) : undefined;
+  const { data } = await supabase.from('lost_items').update(updateData).eq('id', id).select().single();
+  return data ? toLostItem(data as any) : undefined;
 }
 
 export async function getFoundItems(): Promise<FoundItem[]> {
   if (!supabase) return [];
-  const { data } = await supabase.from('reports').select('*').eq('type', 'found');
+  const { data } = await supabase.from('found_items').select('*').order('created_at', { ascending: false });
   return (data || []).map(toFoundItem);
 }
 
 export async function getFoundItemsByUserId(userId: string): Promise<FoundItem[]> {
   if (!supabase) return [];
-  const { data } = await supabase.from('reports').select('*').eq('type', 'found').eq('user_id', userId);
+  const { data } = await supabase.from('found_items').select('*').eq('user_id', userId).order('created_at', { ascending: false });
   return (data || []).map(toFoundItem);
 }
 
 export async function createFoundItem(item: FoundItem): Promise<FoundItem> {
-  if (!supabase) throw new Error('Supabase not configured');
-  const { data } = await supabase.from('reports').insert({
-    type: 'found',
+  if (!supabase) {
+    console.error('Supabase not configured');
+    throw new Error('Supabase not configured');
+  }
+  
+  const insertData = {
     title: item.itemName,
     description: item.description,
-    bus_line_id: item.busLine ? parseInt(item.busLine) : null,
+    bus_line_id: item.busLine && item.busLine !== 'N/A' ? parseInt(item.busLine) : null,
     bus_registration: item.busRegistration,
     date: item.date,
     time: item.time,
     location: item.location,
     image_url: item.photoUrl,
-    is_anonymous: false,
     status: 'active',
-    user_id: item.userId,
-    contact_name: item.finderName,
-    contact_phone: item.finderPhone,
+    user_id: item.userId || null,
+    finder_name: item.finderName,
+    finder_phone: item.finderPhone,
     created_at: item.createdAt,
-  }).select().single();
-  return toFoundItem(data as DatabaseReport);
+  };
+  
+  console.log('Inserting into found_items:', insertData);
+  
+  const { data, error } = await supabase
+    .from('found_items')
+    .insert(insertData)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Supabase insert error:', error);
+    throw new Error(error.message);
+  }
+  
+  if (!data) {
+    throw new Error('No data returned from insert');
+  }
+  
+  return toFoundItem(data);
 }
 
 export async function updateFoundItem(id: string, updates: Partial<FoundItem>): Promise<FoundItem | undefined> {
@@ -290,8 +351,8 @@ export async function updateFoundItem(id: string, updates: Partial<FoundItem>): 
   if (updates.description) updateData.description = updates.description;
   if (updates.status) updateData.status = updates.status;
   
-  const { data } = await supabase.from('reports').update(updateData).eq('id', id).select().single();
-  return data ? toFoundItem(data as DatabaseReport) : undefined;
+  const { data } = await supabase.from('found_items').update(updateData).eq('id', id).select().single();
+  return data ? toFoundItem(data as any) : undefined;
 }
 
 export async function getUserReports(userId: string) {
@@ -320,20 +381,20 @@ export async function getAllFoundItems(): Promise<FoundItem[]> {
 
 export async function getProblemById(id: string): Promise<Problem | undefined> {
   if (!supabase) return undefined;
-  const { data } = await supabase.from('reports').select('*').eq('id', id).eq('type', 'problem').single();
-  return data ? toProblem(data as DatabaseReport) : undefined;
+  const { data } = await supabase.from('problems').select('*').eq('id', id).single();
+  return data ? toProblem(data as any) : undefined;
 }
 
 export async function getLostItemById(id: string): Promise<LostItem | undefined> {
   if (!supabase) return undefined;
-  const { data } = await supabase.from('reports').select('*').eq('id', id).eq('type', 'lost').single();
-  return data ? toLostItem(data as DatabaseReport) : undefined;
+  const { data } = await supabase.from('lost_items').select('*').eq('id', id).single();
+  return data ? toLostItem(data as any) : undefined;
 }
 
 export async function getFoundItemById(id: string): Promise<FoundItem | undefined> {
   if (!supabase) return undefined;
-  const { data } = await supabase.from('reports').select('*').eq('id', id).eq('type', 'found').single();
-  return data ? toFoundItem(data as DatabaseReport) : undefined;
+  const { data } = await supabase.from('found_items').select('*').eq('id', id).single();
+  return data ? toFoundItem(data as any) : undefined;
 }
 
 export async function getAllReports() {
@@ -350,19 +411,19 @@ export async function getAllReports() {
 
 export async function deleteProblem(id: string): Promise<boolean> {
   if (!supabase) return false;
-  await supabase.from('reports').delete().eq('id', id).eq('type', 'problem');
+  await supabase.from('problems').delete().eq('id', id);
   return true;
 }
 
 export async function deleteLostItem(id: string): Promise<boolean> {
   if (!supabase) return false;
-  await supabase.from('reports').delete().eq('id', id).eq('type', 'lost');
+  await supabase.from('lost_items').delete().eq('id', id);
   return true;
 }
 
 export async function deleteFoundItem(id: string): Promise<boolean> {
   if (!supabase) return false;
-  await supabase.from('reports').delete().eq('id', id).eq('type', 'found');
+  await supabase.from('found_items').delete().eq('id', id);
   return true;
 }
 
@@ -370,9 +431,9 @@ export async function getReportsByBusLine(busLine: string) {
   if (!supabase) return { problems: [], lostItems: [], foundItems: [], total: 0 };
   const lineId = parseInt(busLine);
   
-  const { data: problems } = await supabase.from('reports').select('*').eq('type', 'problem').eq('bus_line_id', lineId);
-  const { data: lostItems } = await supabase.from('reports').select('*').eq('type', 'lost').eq('bus_line_id', lineId);
-  const { data: foundItems } = await supabase.from('reports').select('*').eq('type', 'found').eq('bus_line_id', lineId);
+  const { data: problems } = await supabase.from('problems').select('*').eq('bus_line_id', lineId);
+  const { data: lostItems } = await supabase.from('lost_items').select('*').eq('bus_line_id', lineId);
+  const { data: foundItems } = await supabase.from('found_items').select('*').eq('bus_line_id', lineId);
   
   return {
     problems: (problems || []).map(toProblem),
@@ -384,16 +445,25 @@ export async function getReportsByBusLine(busLine: string) {
 
 export async function getReportsByType(type: 'problem' | 'lost' | 'found') {
   if (!supabase) return { reports: [], total: 0 };
-  const { data } = await supabase.from('reports').select('*').eq('type', type);
   
-  if (!data) return { reports: [], total: 0 };
-  
+  let data;
   let mapped: any[] = [];
-  if (type === 'problem') mapped = data.map(toProblem);
-  else if (type === 'lost') mapped = data.map(toLostItem);
-  else mapped = data.map(toFoundItem);
   
-  return { reports: mapped, total: data.length };
+  if (type === 'problem') {
+    const result = await supabase.from('problems').select('*').order('created_at', { ascending: false });
+    data = result.data;
+    mapped = (data || []).map(toProblem);
+  } else if (type === 'lost') {
+    const result = await supabase.from('lost_items').select('*').order('created_at', { ascending: false });
+    data = result.data;
+    mapped = (data || []).map(toLostItem);
+  } else {
+    const result = await supabase.from('found_items').select('*').order('created_at', { ascending: false });
+    data = result.data;
+    mapped = (data || []).map(toFoundItem);
+  }
+  
+  return { reports: mapped, total: data?.length || 0 };
 }
 
 export async function getBusLines(): Promise<BusLine[]> {

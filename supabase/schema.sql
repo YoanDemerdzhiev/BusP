@@ -1,5 +1,6 @@
 -- Complete Working Schema for BusP App
 -- Run this in Supabase SQL Editor (Dashboard > SQL Editor)
+-- This replaces the old unified "reports" table with 3 separate tables
 
 -- 1. Create profiles table
 CREATE TABLE IF NOT EXISTS profiles (
@@ -18,13 +19,12 @@ CREATE TABLE IF NOT EXISTS bus_lines (
   route_name TEXT
 );
 
--- 3. Create reports table
-CREATE TABLE IF NOT EXISTS reports (
+-- 3. Create problems table
+CREATE TABLE IF NOT EXISTS problems (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type TEXT NOT NULL,
   title TEXT,
   description TEXT,
-  bus_line_id INTEGER,
+  bus_line_id INTEGER REFERENCES bus_lines(id),
   bus_registration TEXT,
   date DATE NOT NULL,
   time TEXT,
@@ -33,12 +33,65 @@ CREATE TABLE IF NOT EXISTS reports (
   is_anonymous BOOLEAN DEFAULT FALSE,
   status TEXT DEFAULT 'new',
   user_id UUID,
-  contact_name TEXT,
-  contact_phone TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Insert bus lines (Plovdiv routes)
+-- 4. Create lost_items table
+CREATE TABLE IF NOT EXISTS lost_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT,
+  description TEXT,
+  bus_line_id INTEGER REFERENCES bus_lines(id),
+  bus_registration TEXT,
+  date DATE NOT NULL,
+  time TEXT,
+  location TEXT NOT NULL,
+  image_url TEXT,
+  status TEXT DEFAULT 'active',
+  user_id UUID,
+  reporter_name TEXT,
+  reporter_phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. Create found_items table
+CREATE TABLE IF NOT EXISTS found_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT,
+  description TEXT,
+  bus_line_id INTEGER REFERENCES bus_lines(id),
+  bus_registration TEXT,
+  date DATE NOT NULL,
+  time TEXT,
+  location TEXT NOT NULL,
+  image_url TEXT,
+  status TEXT DEFAULT 'active',
+  user_id UUID,
+  finder_name TEXT,
+  finder_phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. Create resolved_reports table (for resolved/archived reports)
+CREATE TABLE IF NOT EXISTS resolved_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  original_id UUID NOT NULL,
+  type TEXT NOT NULL,
+  title TEXT,
+  description TEXT,
+  bus_line_id INTEGER,
+  bus_registration TEXT,
+  date DATE,
+  time TEXT,
+  location TEXT,
+  image_url TEXT,
+  is_anonymous BOOLEAN DEFAULT FALSE,
+  contact_name TEXT,
+  contact_phone TEXT,
+  resolved_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 7. Insert bus lines (Plovdiv routes)
 INSERT INTO bus_lines (line_number, route_name) VALUES
   ('1', 'Каменица - Синчец'),
   ('2', 'Хаджи Димитър - жк. Тракия'),
@@ -63,7 +116,7 @@ INSERT INTO bus_lines (line_number, route_name) VALUES
   ('38', 'Остров Владово - Толева'),
   ('44', 'Пиер - жк. Тракия'),
   ('49', 'Гребна база - Пеещи фонтани'),
-  ('50', 'Момина крепост - Куклен театър'),
+  ('50', 'Моми��а крепост - Куклен театър'),
   ('60', 'Белащица - Централна гара'),
   ('61', 'Белащица - Кючук Париж'),
   ('66', 'Тутрановци - Съра'),
@@ -72,12 +125,15 @@ INSERT INTO bus_lines (line_number, route_name) VALUES
   ('99', 'Централна гара - Летище')
 ON CONFLICT (line_number) DO NOTHING;
 
--- 5. Disable RLS for profiles (so signup/login works without issues)
+-- 8. Disable RLS (temporarily for development)
 ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE bus_lines DISABLE ROW LEVEL SECURITY;
-ALTER TABLE reports DISABLE ROW LEVEL SECURITY;
+ALTER TABLE problems DISABLE ROW LEVEL SECURITY;
+ALTER TABLE lost_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE found_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE resolved_reports DISABLE ROW LEVEL SECURITY;
 
--- 6. Create trigger to auto-create profile when user signs up
+-- 9. Create trigger to auto-create profile when user signs up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -97,5 +153,8 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- OPTIONAL: Drop old reports table after verifying new tables work
+-- DROP TABLE IF EXISTS reports;
 
 -- Done! Run in Supabase SQL Editor.

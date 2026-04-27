@@ -23,28 +23,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const initAuth = async () => {
-      if (isConfigured && supabase) {
-        try {
-          await initSupabaseAuth();
-        } catch (e) {
-          console.error('Supabase auth error:', e);
-        }
-      }
-      initLocalAuth();
-      setIsLoading(false);
-    };
-
-    const timeoutId = setTimeout(() => {
-      setIsLoading(false);
-    }, 3000);
-
-    initAuth();
-
-    return () => clearTimeout(timeoutId);
-  }, []);
-
   const initLocalAuth = () => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (token) {
@@ -109,6 +87,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Auth init error:', error);
     }
   };
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (isConfigured && supabase) {
+          await initSupabaseAuth();
+        }
+      } catch (e) {
+        console.error('Supabase auth error:', e);
+      } finally {
+        initLocalAuth();
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+    }, 3000);
+
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   const login = async (email: string, password: string) => {
     if (isConfigured && supabase) {

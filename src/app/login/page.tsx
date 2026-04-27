@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Bus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,16 +26,21 @@ export default function LoginPage() {
     
     setIsLoading(true);
     
-    setTimeout(() => {
-      const result = login(email, password);
-      if (result.success) {
-        router.push('/home');
-      } else {
-        setError(result.error || 'Възникна грешка');
-      }
-      setIsLoading(false);
-    }, 500);
+    const result = await login(email, password);
+    setIsLoading(false);
+    
+    if (result.success) {
+      router.push('/home');
+    } else {
+      setError(result.error || 'Възникна грешка');
+    }
   };
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/home');
+    }
+  }, [user, router]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center p-4">

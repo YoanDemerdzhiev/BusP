@@ -1,4 +1,5 @@
 import { User, Problem, LostItem, FoundItem, ResolvedReport, Database } from './types';
+import { isConfigured } from './supabase';
 
 const DB_KEY = 'busp_database';
 
@@ -98,7 +99,7 @@ export function getProblemsByUserId(userId: string): Problem[] {
 }
 
 export function getPublicProblems(): Problem[] {
-  return readDatabase().problems.filter((p) => !p.isAnonymous);
+  return readDatabase().problems.filter((p) => p.isAnonymous);
 }
 
 export function createProblem(problem: Problem): Problem {

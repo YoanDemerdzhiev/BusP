@@ -16,7 +16,7 @@ export default function Home() {
     } else {
       router.replace('/login');
     }
-  }, [user, isLoading, router]);
+  }, [isLoading, user, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">

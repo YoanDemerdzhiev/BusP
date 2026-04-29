@@ -1,4 +1,4 @@
-import { supabase, isConfigured } from './supabase';
+import { supabase, getAdminClient, isConfigured } from './supabase';
 import { BUS_LINES_PLOVDIV } from './types';
 
 const ADMIN_TOKEN_KEY = 'busp_admin_token';
@@ -87,36 +87,57 @@ export async function loginAdmin(email: string, password: string) {
 }
 
 export async function getAllReports() {
-  if (isConfigured && supabase) {
-    const { data: problems, error: probError } = await supabase
-      .from('problems')
-      .select('*')
-      .order('created_at', { ascending: false });
+  if (isConfigured) {
+    try {
+      const adminClient = getAdminClient();
+      const { data: problems, error: probError } = await adminClient
+        .from('problems')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    const { data: lostItems, error: lostError } = await supabase
-      .from('lost_items')
-      .select('*')
-      .order('created_at', { ascending: false });
+      const { data: lostItems, error: lostError } = await adminClient
+        .from('lost_items')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    const { data: foundItems, error: foundError } = await supabase
-      .from('found_items')
-      .select('*')
-      .order('created_at', { ascending: false });
+      const { data: foundItems, error: foundError } = await adminClient
+        .from('found_items')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (probError || lostError || foundError) {
-      throw new Error(probError?.message || lostError?.message || foundError?.message);
+      if (probError || lostError || foundError) {
+        throw new Error(probError?.message || lostError?.message || foundError?.message);
+      }
+
+      const reports = [
+        ...(problems || []).map((r: any) => ({ ...r, reportType: 'problem', isAnonymous: r.is_anonymous })),
+        ...(lostItems || []).map((r: any) => ({ ...r, reportType: 'lost', isAnonymous: false })),
+        ...(foundItems || []).map((r: any) => ({ ...r, reportType: 'found', isAnonymous: false })),
+      ];
+
+      return {
+        reports,
+        total: reports.length,
+      };
+    } catch (error) {
+      if (supabase) {
+        const { data: problems } = await supabase.from('problems').select('*').order('created_at', { ascending: false });
+        const { data: lostItems } = await supabase.from('lost_items').select('*').order('created_at', { ascending: false });
+        const { data: foundItems } = await supabase.from('found_items').select('*').order('created_at', { ascending: false });
+
+        const reports = [
+          ...(problems || []).map((r: any) => ({ ...r, reportType: 'problem', isAnonymous: r.is_anonymous })),
+          ...(lostItems || []).map((r: any) => ({ ...r, reportType: 'lost', isAnonymous: false })),
+          ...(foundItems || []).map((r: any) => ({ ...r, reportType: 'found', isAnonymous: false })),
+        ];
+
+        return {
+          reports,
+          total: reports.length,
+        };
+      }
+      throw error;
     }
-
-    const reports = [
-      ...(problems || []).map((r: any) => ({ ...r, reportType: 'problem', isAnonymous: r.is_anonymous })),
-      ...(lostItems || []).map((r: any) => ({ ...r, reportType: 'lost', isAnonymous: false })),
-      ...(foundItems || []).map((r: any) => ({ ...r, reportType: 'found', isAnonymous: false })),
-    ];
-
-    return {
-      reports,
-      total: reports.length,
-    };
   } else {
     const db = getDatabase();
     if (!db) throw new Error('Database not available');
@@ -133,20 +154,38 @@ export async function getAllReports() {
 }
 
 export async function getResolvedReports() {
-  if (isConfigured && supabase) {
-    const { data, error } = await supabase
-      .from('resolved_reports')
-      .select('*')
-      .order('resolved_at', { ascending: false });
+  if (isConfigured) {
+    try {
+      const adminClient = getAdminClient();
+      const { data, error } = await adminClient
+        .from('resolved_reports')
+        .select('*')
+        .order('resolved_at', { ascending: false });
 
-    if (error) {
-      throw new Error(error.message);
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return {
+        reports: data || [],
+        total: (data || []).length,
+      };
+    } catch (error) {
+      if (supabase) {
+        const { data, error: fallbackError } = await supabase
+          .from('resolved_reports')
+          .select('*')
+          .order('resolved_at', { ascending: false });
+
+        if (fallbackError) throw new Error(fallbackError.message);
+
+        return {
+          reports: data || [],
+          total: (data || []).length,
+        };
+      }
+      throw error;
     }
-
-    return {
-      reports: data || [],
-      total: (data || []).length,
-    };
   } else {
     const db = getDatabase();
     if (!db) throw new Error('Database not available');
@@ -159,35 +198,70 @@ export async function getResolvedReports() {
 }
 
 export async function getBusLinesData() {
-  if (isConfigured && supabase) {
-    const { data: busLines } = await supabase
-      .from('bus_lines')
-      .select('*')
-      .order('line_number');
+  if (isConfigured) {
+    try {
+      const adminClient = getAdminClient();
+      const { data: busLines } = await adminClient
+        .from('bus_lines')
+        .select('*')
+        .order('line_number');
 
-    const { data: problems } = await supabase.from('problems').select('*');
-    const { data: lostItems } = await supabase.from('lost_items').select('*');
-    const { data: foundItems } = await supabase.from('found_items').select('*');
+      const { data: problems } = await adminClient.from('problems').select('*');
+      const { data: lostItems } = await adminClient.from('lost_items').select('*');
+      const { data: foundItems } = await adminClient.from('found_items').select('*');
 
-    const result = (busLines || []).map((line: any) => {
-      const lineProblems = (problems || []).filter((r: any) => r.bus_line_id === line.id);
-      const lineLost = (lostItems || []).filter((r: any) => r.bus_line_id === line.id);
-      const lineFound = (foundItems || []).filter((r: any) => r.bus_line_id === line.id);
+      const result = (busLines || []).map((line: any) => {
+        const lineProblems = (problems || []).filter((r: any) => r.bus_line_id === line.id);
+        const lineLost = (lostItems || []).filter((r: any) => r.bus_line_id === line.id);
+        const lineFound = (foundItems || []).filter((r: any) => r.bus_line_id === line.id);
+
+        return {
+          line: line.line_number,
+          route: line.route_name,
+          totalReports: lineProblems.length + lineLost.length + lineFound.length,
+          problems: lineProblems.length,
+          lost: lineLost.length,
+          found: lineFound.length,
+        };
+      });
 
       return {
-        line: line.line_number,
-        route: line.route_name,
-        totalReports: lineProblems.length + lineLost.length + lineFound.length,
-        problems: lineProblems.length,
-        lost: lineLost.length,
-        found: lineFound.length,
+        busLines: result,
+        total: result.length,
       };
-    });
+    } catch (error) {
+      if (supabase) {
+        const { data: busLines } = await supabase
+          .from('bus_lines')
+          .select('*')
+          .order('line_number');
 
-    return {
-      busLines: result,
-      total: result.length,
-    };
+        const { data: problems } = await supabase.from('problems').select('*');
+        const { data: lostItems } = await supabase.from('lost_items').select('*');
+        const { data: foundItems } = await supabase.from('found_items').select('*');
+
+        const result = (busLines || []).map((line: any) => {
+          const lineProblems = (problems || []).filter((r: any) => r.bus_line_id === line.id);
+          const lineLost = (lostItems || []).filter((r: any) => r.bus_line_id === line.id);
+          const lineFound = (foundItems || []).filter((r: any) => r.bus_line_id === line.id);
+
+          return {
+            line: line.line_number,
+            route: line.route_name,
+            totalReports: lineProblems.length + lineLost.length + lineFound.length,
+            problems: lineProblems.length,
+            lost: lineLost.length,
+            found: lineFound.length,
+          };
+        });
+
+        return {
+          busLines: result,
+          total: result.length,
+        };
+      }
+      throw error;
+    }
   } else {
     const db = getDatabase();
     if (!db) throw new Error('Database not available');
@@ -212,54 +286,60 @@ export async function getBusLinesData() {
 }
 
 export async function resolveReport(reportData: any) {
-  if (isConfigured && supabase) {
-    const { type, id } = reportData;
+  if (isConfigured) {
+    try {
+      const adminClient = getAdminClient();
+      const { type, id } = reportData;
 
-    let tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
+      let tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
 
-    const { data: original, error: fetchError } = await supabase
-      .from(tableName)
-      .select('*')
-      .eq('id', id)
-      .single();
+      const { data: original, error: fetchError } = await adminClient
+        .from(tableName)
+        .select('*')
+        .eq('id', id)
+        .single();
 
-    if (fetchError || !original) {
-      throw new Error('Report not found');
+      if (fetchError || !original) {
+        throw new Error('Report not found');
+      }
+
+      const { error: insertError } = await adminClient
+        .from('resolved_reports')
+        .insert({
+          original_id: original.id,
+          type: type,
+          title: original.title,
+          description: original.description,
+          bus_line_id: original.bus_line_id,
+          bus_registration: original.bus_registration,
+          date: original.date,
+          time: original.time,
+          location: original.location,
+          image_url: original.image_url,
+          is_anonymous: original.is_anonymous,
+          user_id: original.user_id,
+          contact_name: original.reporter_name || original.finder_name,
+          contact_phone: original.reporter_phone || original.finder_phone,
+          resolved_at: new Date().toISOString(),
+        });
+
+      if (insertError) {
+        throw new Error(insertError.message);
+      }
+
+      const { error: deleteError } = await adminClient
+        .from(tableName)
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        throw new Error(deleteError.message);
+      }
+
+      return { success: true };
+    } catch (error) {
+      throw error;
     }
-
-    const { error: insertError } = await supabase
-      .from('resolved_reports')
-      .insert({
-        original_id: original.id,
-        type: type,
-        title: original.title,
-        description: original.description,
-        bus_line_id: original.bus_line_id,
-        bus_registration: original.bus_registration,
-        date: original.date,
-        time: original.time,
-        location: original.location,
-        image_url: original.image_url,
-        is_anonymous: original.is_anonymous,
-        contact_name: original.reporter_name || original.finder_name,
-        contact_phone: original.reporter_phone || original.finder_phone,
-        resolved_at: new Date().toISOString(),
-      });
-
-    if (insertError) {
-      throw new Error(insertError.message);
-    }
-
-    const { error: deleteError } = await supabase
-      .from(tableName)
-      .delete()
-      .eq('id', id);
-
-    if (deleteError) {
-      throw new Error(deleteError.message);
-    }
-
-    return { success: true };
   } else {
     const db = getDatabase();
     if (!db) throw new Error('Database not available');
@@ -318,19 +398,24 @@ export async function resolveReport(reportData: any) {
 }
 
 export async function deleteReport(reportId: string, type: string) {
-  if (isConfigured && supabase) {
-    let tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
+  if (isConfigured) {
+    try {
+      const adminClient = getAdminClient();
+      let tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
 
-    const { error } = await supabase
-      .from(tableName)
-      .delete()
-      .eq('id', reportId);
+      const { error } = await adminClient
+        .from(tableName)
+        .delete()
+        .eq('id', reportId);
 
-    if (error) {
-      throw new Error(error.message);
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return { success: true };
+    } catch (error) {
+      throw error;
     }
-
-    return { success: true };
   } else {
     const db = getDatabase();
     if (!db) throw new Error('Database not available');

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
 import ProtectedRoute from '@/components/ProtectedRoute';

@@ -4,8 +4,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 
 export const metadata: Metadata = {
-  title: "BusP - Сигнали за обществен транспорт",
-  description: "Приложение за подаване на сигнали за проблеми, изгубени и намерени предмети в обществения транспорт",
+  title: "BusP - Signals for Public Transport",
+  description: "Application for reporting issues, lost and found items in public transport",
 };
 
 export default function RootLayout({
@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="bg" suppressHydrationWarning>
+    <html lang="bg">
       <body className="antialiased">
         <ThemeProvider>
           <AuthProvider>

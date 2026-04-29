@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyUser, getUsers } from '@/lib/data';
+import { loginAdmin } from '@/lib/admin-api';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,39 +13,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const users = getUsers();
-    const user = verifyUser(email, password);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Invalid credentials' },
-        { status: 401 }
-      );
-    }
-
-    if (user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Access denied. Admin role required.' },
-        { status: 403 }
-      );
-    }
-
-    const token = Buffer.from(`${user.id}:${user.email}:${user.role}`).toString('base64');
+    const result = await loginAdmin(email, password);
 
     return NextResponse.json({
       success: true,
-      token,
+      token: result.token,
       user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
+        id: result.user.id,
+        email: result.user.email,
+        firstName: result.user.first_name || result.user.firstName,
+        lastName: result.user.last_name || result.user.lastName,
+        role: result.user.role,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === 'Access denied. Admin role required.') {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 403 }
+      );
+    }
+    if (error.message === 'Invalid credentials') {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 401 }
+      );
+    }
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }

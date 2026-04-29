@@ -2,6 +2,13 @@
 -- Run this in Supabase SQL Editor (Dashboard > SQL Editor)
 -- This replaces the old unified "reports" table with 3 separate tables
 
+-- =========================================
+-- IMPORTANT: RLS (Row Level Security)
+-- =========================================
+-- This schema DISABLES RLS for development convenience
+-- For PRODUCTION, run rls-policies.sql instead!
+-- See /supabase/rls-policies.sql for production-ready policies
+
 -- 1. Create profiles table
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY,
@@ -86,6 +93,7 @@ CREATE TABLE IF NOT EXISTS resolved_reports (
   location TEXT,
   image_url TEXT,
   is_anonymous BOOLEAN DEFAULT FALSE,
+  user_id UUID,
   contact_name TEXT,
   contact_phone TEXT,
   resolved_at TIMESTAMPTZ DEFAULT NOW()

@@ -7,28 +7,33 @@ import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
 import NavMenu from '@/components/NavMenu';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { FoundItem } from '@/lib/types';
-import { getFoundItems } from '@/lib/db-supabase';
+import { getLostItems } from '@/lib/db-supabase';
+import { LostItem } from '@/lib/types';
 
 export default function LostPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [foundItems, setFoundItems] = useState<FoundItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<FoundItem | null>(null);
+  const [lostItems, setLostItems] = useState<LostItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<LostItem | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    async function loadFoundItems() {
-      const items = await getFoundItems();
-      setFoundItems(items);
-    }
-    loadFoundItems();
+    loadLostItems();
   }, []);
 
-  const filteredItems = foundItems.filter(item => 
-    item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.location.toLowerCase().includes(searchQuery.toLowerCase())
+  const loadLostItems = async () => {
+    try {
+      const data = await getLostItems();
+      setLostItems(data);
+    } catch (error) {
+      console.error('Failed to load lost items:', error);
+    }
+  };
+
+  const filteredItems = lostItems.filter(item => 
+    item.itemName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.location?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (selectedItem) {
@@ -36,7 +41,7 @@ export default function LostPage() {
       <ProtectedRoute>
         <PhoneFrame>
           <Header 
-            title="Намерен предмет" 
+            title="Изгубен предмет" 
             showBack 
             onBackClick={() => setSelectedItem(null)}
           />
@@ -68,10 +73,12 @@ export default function LostPage() {
                   <Clock className="w-4 h-4" />
                   <span>{selectedItem.date} в {selectedItem.time}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
-                  <span>{selectedItem.finderPhone}</span>
-                </div>
+                {selectedItem.reporterPhone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    <span>{selectedItem.reporterPhone}</span>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -81,12 +88,14 @@ export default function LostPage() {
               </p>
             </div>
             
-            <button
-              onClick={() => window.location.href = `tel:${selectedItem.finderPhone}`}
-              className="w-full py-4 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
-            >
-              Обади се
-            </button>
+            {selectedItem.reporterPhone && (
+              <button
+                onClick={() => window.location.href = `tel:${selectedItem.reporterPhone}`}
+                className="w-full py-4 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
+              >
+                Обади се
+              </button>
+            )}
           </div>
         </PhoneFrame>
       </ProtectedRoute>
@@ -98,7 +107,6 @@ export default function LostPage() {
       <PhoneFrame>
         <Header 
           title="Изгубено" 
-          showBack
           onMenuClick={() => setMenuOpen(true)}
         />
         
@@ -116,7 +124,7 @@ export default function LostPage() {
           
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">
             <div className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-              Намерени предмети ({filteredItems.length})
+              Изгубени предмети ({filteredItems.length})
             </div>
             
             {filteredItems.map((item) => (
@@ -155,7 +163,7 @@ export default function LostPage() {
             {filteredItems.length === 0 && (
               <div className="text-center py-12 text-slate-500 dark:text-slate-400">
                 <p className="text-4xl mb-2">🔍</p>
-                <p>Все още няма намерени предмети</p>
+                <p>Все още няма изгубени предмети</p>
               </div>
             )}
           </div>

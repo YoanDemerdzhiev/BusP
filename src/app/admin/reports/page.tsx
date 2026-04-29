@@ -18,7 +18,7 @@ import {
   Package,
   CheckCircle
 } from 'lucide-react';
-import { getAllReports, getResolvedReports, resolveReport, deleteReport } from '@/lib/admin-api';
+import { getAllReports, getResolvedReports } from '@/lib/admin-api';
 import { BUS_LINES_PLOVDIV } from '@/lib/types';
 
 interface Report {
@@ -96,31 +96,48 @@ export default function AdminReportsPage() {
   const handleResolve = async (report: Report) => {
     setIsResolving(true);
     try {
-      await resolveReport({
-        type: report.reportType,
-        id: report.id,
+      const response = await fetch('/api/admin/reports/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: report.reportType, id: report.id }),
       });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to resolve report');
+      }
+      
       setShowDetail(false);
       setSelectedReport(null);
       loadReports();
     } catch (error) {
       console.error('Failed to resolve report:', error);
+      alert('Failed to resolve report: ' + (error as Error).message);
     } finally {
       setIsResolving(false);
     }
   };
-
+  
   const handleDelete = async (report: Report) => {
     if (!confirm('Are you sure you want to delete this report?')) return;
     
     setIsDeleting(true);
     try {
-      await deleteReport(report.id, report.reportType);
+      const response = await fetch(`/api/admin/reports/delete?id=${report.id}&type=${report.reportType}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete report');
+      }
+      
       setShowDetail(false);
       setSelectedReport(null);
       loadReports();
     } catch (error) {
       console.error('Failed to delete report:', error);
+      alert('Failed to delete report: ' + (error as Error).message);
     } finally {
       setIsDeleting(false);
     }

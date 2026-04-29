@@ -20,19 +20,19 @@ export default function ReportsPage() {
 
   useEffect(() => {
     async function loadReports() {
-      if (user) {
-        const [problemsData, lostData, foundData] = await Promise.all([
-          getProblemsByUserId(user.id),
-          getLostItemsByUserId(user.id),
-          getFoundItemsByUserId(user.id)
-        ]);
-        setProblems(problemsData);
-        setLostItems(lostData);
-        setFoundItems(foundData);
-      }
+      if (!user) return;
+      
+      const [problemsData, lostData, foundData] = await Promise.all([
+        getProblemsByUserId(user.id),
+        getLostItemsByUserId(user.id),
+        getFoundItemsByUserId(user.id)
+      ]);
+      setProblems(problemsData);
+      setLostItems(lostData);
+      setFoundItems(foundData);
     }
     loadReports();
-  }, [user]);
+  }, [user?.id]);
 
   const tabs: { key: TabType; label: string; count: number }[] = [
     { key: 'all', label: 'Всички', count: problems.length + lostItems.length + foundItems.length },

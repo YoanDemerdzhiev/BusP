@@ -14,11 +14,12 @@ export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const handleLogout = async () => {
-    await logout();
+  const handleLogout = () => {
+    const { logout } = useAuth();
+    logout();
     router.push('/login');
   };
 

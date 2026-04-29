@@ -7,7 +7,6 @@ import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateUser } from '@/lib/data';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -31,17 +30,19 @@ export default function ProfilePage() {
 
     setIsSaving(true);
 
-    setTimeout(() => {
-      const updates = { firstName, lastName, email };
-      updateUser(user?.id || '', updates);
-      updateProfile(updates);
+    try {
+      const updates = { firstName, lastName, email: user?.email || email };
+      await updateProfile(updates);
       setSuccess(true);
       setIsSaving(false);
       
       setTimeout(() => {
         router.push('/home');
       }, 1500);
-    }, 500);
+    } catch (error) {
+      setError('Грешка при запазване на профила');
+      setIsSaving(false);
+    }
   };
 
   if (success) {

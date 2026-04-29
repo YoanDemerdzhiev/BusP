@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserById } from '@/lib/data';
+import { getUserById } from '@/lib/db-supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       const decoded = Buffer.from(token, 'base64').toString();
       const [userId] = decoded.split(':');
       
-      const user = getUserById(userId);
+      const user = await getUserById(userId);
       
       if (!user || user.role !== 'admin') {
         return NextResponse.json(
@@ -40,9 +40,9 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
-  } catch (error) {
+  } catch (error: any) {
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }

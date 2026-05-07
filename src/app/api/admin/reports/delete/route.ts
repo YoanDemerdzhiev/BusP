@@ -16,7 +16,7 @@ export async function DELETE(request: NextRequest) {
 
     const adminClient = getAdminClient();
     
-    let tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
+    const tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
 
     const { error } = await adminClient
       .from(tableName)

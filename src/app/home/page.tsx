@@ -17,12 +17,6 @@ export default function HomePage() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const handleLogout = () => {
-    const { logout } = useAuth();
-    logout();
-    router.push('/login');
-  };
-
   return (
     <ProtectedRoute>
       <PhoneFrame>

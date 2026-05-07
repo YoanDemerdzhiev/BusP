@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Upload, Camera, CheckCircle } from 'lucide-react';
+import { Camera, CheckCircle } from 'lucide-react';
 import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -75,7 +75,7 @@ function ReportForm() {
       setIsSubmitting(false);
       
       setTimeout(() => {
-        router.push('/lost');
+        router.push('/lost/create');
       }, 2000);
     } catch (err: any) {
       setError(err.message || 'Възникна грешка');

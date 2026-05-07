@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Bus, AlertTriangle, Package, CheckCircle } from 'lucide-react';
-import { getBusLinesData } from '@/lib/admin-api';
 
 interface BusLineData {
   line: string;
@@ -18,20 +17,21 @@ export default function AdminBusLinesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    loadBusLines();
-  }, []);
-
-  const loadBusLines = async () => {
+  async function loadBusLines() {
     try {
-      const data = await getBusLinesData();
+      const response = await fetch('/api/admin/bus-lines');
+      const data = await response.json();
       setBusLines(data.busLines);
     } catch (error) {
       console.error('Failed to load bus lines:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    loadBusLines();
+  }, []);
 
   const filteredLines = busLines.filter(line => 
     line.line.includes(searchQuery) || 
@@ -137,7 +137,7 @@ export default function AdminBusLinesPage() {
             ))}
           </tbody>
         </table>
-        
+
         {filteredLines.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-slate-500">
             <Bus className="w-12 h-12 mb-2" />

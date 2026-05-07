@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Upload, Camera, CheckCircle, PackageOpen } from 'lucide-react';
+import { Camera, CheckCircle } from 'lucide-react';
 import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -16,11 +16,12 @@ function ReportForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const lostItemId = searchParams.get('lostItemId');
+  const busLineParam = searchParams.get('line') || '';
   const { user } = useAuth();
 
   const [lostItem, setLostItem] = useState<LostItem | null>(null);
   const [itemName, setItemName] = useState('');
-  const [busLine, setBusLine] = useState('');
+  const [busLine, setBusLine] = useState(busLineParam);
   const [busRegistration, setBusRegistration] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -33,13 +34,7 @@ function ReportForm() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (lostItemId) {
-      loadLostItem(lostItemId);
-    }
-  }, [lostItemId]);
-
-  const loadLostItem = async (id: string) => {
+  async function loadLostItem(id: string) {
     try {
       const item = await getLostItemById(id);
       if (item) {
@@ -53,7 +48,13 @@ function ReportForm() {
     } catch (err) {
       console.error('Failed to load lost item:', err);
     }
-  };
+  }
+
+  useEffect(() => {
+    if (lostItemId) {
+      loadLostItem(lostItemId);
+    }
+  }, [lostItemId]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     const adminClient = getAdminClient();
     
-    let tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
+    const tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
 
     const { data: original, error: fetchError } = await adminClient
       .from(tableName)

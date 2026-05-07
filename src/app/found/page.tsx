@@ -17,18 +17,18 @@ export default function FoundPage() {
   const [selectedItem, setSelectedItem] = useState<LostItem | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    loadLostItems();
-  }, []);
-
-  const loadLostItems = async () => {
+  async function loadLostItems() {
     try {
       const data = await getLostItems();
       setLostItems(data);
     } catch (error) {
       console.error('Failed to load lost items:', error);
     }
-  };
+  }
+
+  useEffect(() => {
+    loadLostItems();
+  }, []);
 
   const filteredItems = lostItems.filter(item => 
     item.itemName?.toLowerCase().includes(searchQuery.toLowerCase()) ||

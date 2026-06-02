@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase';
+import { verifyAdminRequest } from '@/lib/admin-auth';
 
 export async function DELETE(request: NextRequest) {
+  const auth = await verifyAdminRequest(request);
+  if (auth instanceof Response) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

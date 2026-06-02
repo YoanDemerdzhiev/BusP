@@ -14,7 +14,7 @@ export default function ProfilePage() {
 
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const [email] = useState(user?.email || '');
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -31,7 +31,7 @@ export default function ProfilePage() {
     setIsSaving(true);
 
     try {
-      const updates = { firstName, lastName, email: user?.email || email };
+      const updates = { firstName, lastName };
       await updateProfile(updates);
       setSuccess(true);
       setIsSaving(false);
@@ -115,15 +115,15 @@ export default function ProfilePage() {
             
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Имейл
+                Имейл (не може да бъде променян)
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
+                  readOnly
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-600 text-slate-500 dark:text-slate-400 outline-none cursor-not-allowed"
                 />
               </div>
             </div>

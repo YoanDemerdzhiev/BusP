@@ -75,7 +75,7 @@ function ReportForm() {
       setIsSubmitting(false);
       
       setTimeout(() => {
-        router.push('/lost/create');
+        router.push('/lost');
       }, 2000);
     } catch (err: any) {
       setError(err.message || 'Възникна грешка');

@@ -17,6 +17,8 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { BUS_LINES_PLOVDIV } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 interface Report {
   id: string;
@@ -39,6 +41,7 @@ interface Report {
 }
 
 export default function AdminReportsPage() {
+  const { logout: adminLogout } = useAdminAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [resolvedReports, setResolvedReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,14 +69,29 @@ export default function AdminReportsPage() {
       if (activeTab === 'resolved') params.set('status', 'resolved');
 
       const query = params.toString() ? `?${params.toString()}` : '';
-      const response = await fetch(`/api/admin/reports${query}`);
+      const session = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = session.data.session?.access_token;
+      const response = await fetch(`/api/admin/reports${query}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          console.error('Admin session expired, logging out');
+          adminLogout();
+          return;
+        }
+        console.error('API error:', response.status, response.statusText);
+        return;
+      }
+
       const data = await response.json();
 
       if (activeTab === 'resolved') {
-        setReports(data.reports);
-        setResolvedReports(data.reports);
+        setReports(data.reports || []);
+        setResolvedReports(data.reports || []);
       } else {
-        setReports(data.reports);
+        setReports(data.reports || []);
       }
     } catch (error) {
       console.error('Failed to load reports:', error);
@@ -89,13 +107,22 @@ export default function AdminReportsPage() {
   const handleResolve = async (report: Report) => {
     setIsResolving(true);
     try {
-      const response = await fetch('/api/admin/reports/resolve', {
+      const session = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = session.data.session?.access_token;
+      const response = await fetch('/api/admin/reports', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ type: report.reportType, id: report.id }),
       });
 
       if (!response.ok) {
+        if (response.status === 403) {
+          adminLogout();
+          return;
+        }
         const data = await response.json();
         throw new Error(data.error || 'Failed to resolve report');
       }
@@ -116,11 +143,18 @@ export default function AdminReportsPage() {
 
     setIsDeleting(true);
     try {
+      const session = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = session.data.session?.access_token;
       const response = await fetch(`/api/admin/reports/delete?id=${report.id}&type=${report.reportType}`, {
         method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
       });
 
       if (!response.ok) {
+        if (response.status === 403) {
+          adminLogout();
+          return;
+        }
         const data = await response.json();
         throw new Error(data.error || 'Failed to delete report');
       }

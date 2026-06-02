@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   
   const router = useRouter();
-  const { login, user } = useAuth();
+  const { login, user, isLoading: authLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,10 +37,10 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    if (user) {
+    if (!authLoading && user) {
       router.replace('/home');
     }
-  }, [user, router]);
+  }, [authLoading, user, router]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center p-4">

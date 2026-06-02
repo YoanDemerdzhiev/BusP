@@ -45,24 +45,25 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-      
-      if (profileError || !profile || profile.role !== 'admin') {
+      const token = session.access_token;
+      const response = await fetch('/api/admin/verify', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        console.warn('[AdminAuth] Admin profile not found, signing out');
         await supabase.auth.signOut();
         setIsLoading(false);
         return;
       }
 
+      const data = await response.json();
       setAdmin({
-        id: profile.id,
-        email: profile.email,
-        firstName: profile.first_name,
-        lastName: profile.last_name,
-        role: profile.role,
+        id: data.id,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: data.role,
       });
     } catch (e) {
       console.error('Admin auth check error:', e);
@@ -86,27 +87,27 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: error.message };
       }
 
-      if (!data.user) {
+      if (!data.user || !data.session) {
         return { success: false, error: 'Login failed' };
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
+      const token = data.session.access_token;
+      const response = await fetch('/api/admin/verify', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
 
-      if (profileError || !profile || profile.role !== 'admin') {
+      if (!response.ok) {
         await supabase.auth.signOut();
         return { success: false, error: 'Access denied. Admin role required.' };
       }
 
+      const profileData = await response.json();
       setAdmin({
-        id: profile.id,
-        email: profile.email,
-        firstName: profile.first_name,
-        lastName: profile.last_name,
-        role: profile.role,
+        id: profileData.id,
+        email: profileData.email,
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        role: profileData.role,
       });
 
       return { success: true };

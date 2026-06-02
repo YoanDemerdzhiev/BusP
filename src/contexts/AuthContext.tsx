@@ -68,17 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (userProfile) {
           setUser(userProfile);
         } else {
-          // Profile fetch failed (e.g., RLS error) - use auth metadata as fallback
-          console.warn('[Auth] Profile fetch failed, using auth metadata');
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            password: '',
-            firstName: session.user.user_metadata?.first_name || '',
-            lastName: session.user.user_metadata?.last_name || '',
-            role: 'user',
-            createdAt: session.user.created_at || new Date().toISOString(),
-          });
+          console.warn('[Auth] Profile not found, signing out');
+          await supabase.auth.signOut();
+          setUser(null);
         }
       } else {
         setUser(null);
@@ -91,17 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (userProfile) {
             setUser(userProfile);
           } else {
-            // Profile fetch failed - use auth metadata as fallback
-            console.warn('[Auth] Profile fetch failed in listener, using auth metadata');
-            setUser({
-              id: session.user.id,
-              email: session.user.email || '',
-              password: '',
-              firstName: session.user.user_metadata?.first_name || '',
-              lastName: session.user.user_metadata?.last_name || '',
-              role: 'user',
-              createdAt: session.user.created_at || new Date().toISOString(),
-            });
+            console.warn('[Auth] Profile not found in listener, signing out');
+            if (supabase) await supabase.auth.signOut();
+            setUser(null);
           }
         } else {
           setUser(null);
@@ -170,17 +154,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.user) {
         localStorage.setItem(AUTH_TOKEN_KEY, data.user.id);
-        
-        setUser({
-          id: data.user.id,
-          email: data.user.email || email,
-          password: '',
-          firstName: data.user.user_metadata?.first_name || '',
-          lastName: data.user.user_metadata?.last_name || '',
-          role: 'user',
-          createdAt: data.user.created_at || new Date().toISOString(),
-        });
-        
+
+        const profile = await fetchProfile(data.user.id);
+        if (profile) {
+          setUser(profile);
+        } else {
+          console.warn('[Auth] Profile not found after login, signing out');
+          await supabase.auth.signOut();
+          return { success: false, error: 'Profile not found' };
+        }
+
         return { success: true };
       }
 

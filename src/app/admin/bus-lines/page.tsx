@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Bus, AlertTriangle, Package, CheckCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 interface BusLineData {
   line: string;
@@ -13,13 +15,28 @@ interface BusLineData {
 }
 
 export default function AdminBusLinesPage() {
+  const { logout: adminLogout } = useAdminAuth();
   const [busLines, setBusLines] = useState<BusLineData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   async function loadBusLines() {
     try {
-      const response = await fetch('/api/admin/bus-lines');
+      const session = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = session.data.session?.access_token;
+      const response = await fetch('/api/admin/bus-lines', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          adminLogout();
+          return;
+        }
+        console.error('API error:', response.status, response.statusText);
+        return;
+      }
+
       const data = await response.json();
       setBusLines(data.busLines);
     } catch (error) {

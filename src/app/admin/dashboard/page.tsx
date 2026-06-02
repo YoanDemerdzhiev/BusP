@@ -10,7 +10,8 @@ import {
   MapPin
 } from 'lucide-react';
 import Link from 'next/link';
-import { getAllReports, getResolvedReports } from '@/lib/admin-api';
+import { supabase } from '@/lib/supabase';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 interface Stats {
   problems: number;
@@ -32,6 +33,7 @@ interface RecentReport {
 }
 
 export default function AdminDashboardPage() {
+  const { logout: adminLogout } = useAdminAuth();
   const [stats, setStats] = useState<Stats>({
     problems: 0,
     lost: 0,
@@ -44,10 +46,26 @@ export default function AdminDashboardPage() {
 
   async function loadDashboardData() {
     try {
-      const [reportsData, resolvedData] = await Promise.all([
-        getAllReports(),
-        getResolvedReports(),
+      const session = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = session.data.session?.access_token;
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : undefined;
+
+      const [activeRes, resolvedRes] = await Promise.all([
+        fetch('/api/admin/reports', { headers }),
+        fetch('/api/admin/reports?status=resolved', { headers }),
       ]);
+
+      if (!activeRes.ok) {
+        if (activeRes.status === 403) { adminLogout(); return; }
+        throw new Error('Failed to fetch active reports');
+      }
+      if (!resolvedRes.ok) {
+        if (resolvedRes.status === 403) { adminLogout(); return; }
+        throw new Error('Failed to fetch resolved reports');
+      }
+
+      const reportsData = await activeRes.json();
+      const resolvedData = await resolvedRes.json();
 
       const problems = (reportsData.reports || []).filter((r: any) => r.reportType === 'problem').length;
       const lost = (reportsData.reports || []).filter((r: any) => r.reportType === 'lost').length;

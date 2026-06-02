@@ -1,14 +1,5 @@
 import { supabase } from './supabase';
-import { User, Problem, LostItem, FoundItem, ResolvedReport } from './types';
-
-export interface DatabaseUser {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  role: 'user' | 'admin';
-  created_at: string;
-}
+import { Problem, LostItem, FoundItem } from './types';
 
 export interface DatabaseReport {
   id: string;
@@ -33,18 +24,6 @@ export interface BusLine {
   id: number;
   line_number: string;
   route_name: string | null;
-}
-
-export function toUser(dbUser: DatabaseUser): User {
-  return {
-    id: dbUser.id,
-    email: dbUser.email,
-    password: '',
-    firstName: dbUser.first_name,
-    lastName: dbUser.last_name,
-    role: dbUser.role,
-    createdAt: dbUser.created_at,
-  };
 }
 
 export function toProblem(dbReport: DatabaseReport): Problem {
@@ -107,54 +86,6 @@ export function toFoundItem(dbReport: any): FoundItem {
   };
 }
 
-export async function getUsers(): Promise<User[]> {
-  if (!supabase) return [];
-  const { data } = await supabase.from('profiles').select('*');
-  return (data || []).map(toUser);
-}
-
-export async function getUserByEmail(email: string): Promise<User | undefined> {
-  if (!supabase) return undefined;
-  const { data } = await supabase.from('profiles').select('*').eq('email', email.toLowerCase()).single();
-  return data ? toUser(data as DatabaseUser) : undefined;
-}
-
-export async function getUserById(id: string): Promise<User | undefined> {
-  if (!supabase) return undefined;
-  const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
-  return data ? toUser(data as DatabaseUser) : undefined;
-}
-
-export async function createUser(user: User): Promise<User> {
-  if (!supabase) throw new Error('Supabase not configured');
-  const { data } = await supabase.from('profiles').insert({
-    id: user.id,
-    email: user.email,
-    first_name: user.firstName,
-    last_name: user.lastName,
-    role: user.role,
-  }).select().single();
-  return toUser(data as DatabaseUser);
-}
-
-export async function updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
-  if (!supabase) return undefined;
-  const updateData: any = {};
-  if (updates.firstName) updateData.first_name = updates.firstName;
-  if (updates.lastName) updateData.last_name = updates.lastName;
-  if (updates.role) updateData.role = updates.role;
-  
-  const { data } = await supabase.from('profiles').update(updateData).eq('id', id).select().single();
-  return data ? toUser(data as DatabaseUser) : undefined;
-}
-
-export async function verifyUser(email: string, password: string): Promise<User | undefined> {
-  if (!supabase) return undefined;
-  const { data: authData } = await supabase.auth.signInWithPassword({ email, password });
-  if (!authData?.user) return undefined;
-  return getUserById(authData.user.id);
-}
-
 export async function getProblems(): Promise<Problem[]> {
   if (!supabase) return [];
   const { data } = await supabase.from('problems').select('*').order('created_at', { ascending: false });
@@ -164,12 +95,6 @@ export async function getProblems(): Promise<Problem[]> {
 export async function getProblemsByUserId(userId: string): Promise<Problem[]> {
   if (!supabase) return [];
   const { data } = await supabase.from('problems').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-  return (data || []).map(toProblem);
-}
-
-export async function getPublicProblems(): Promise<Problem[]> {
-  if (!supabase) return [];
-  const { data } = await supabase.from('problems').select('*').eq('is_anonymous', true);
   return (data || []).map(toProblem);
 }
 
@@ -411,20 +336,20 @@ export async function getAllReports() {
 
 export async function deleteProblem(id: string): Promise<boolean> {
   if (!supabase) return false;
-  await supabase.from('problems').delete().eq('id', id);
-  return true;
+  const { error } = await supabase.from('problems').delete().eq('id', id);
+  return !error;
 }
 
 export async function deleteLostItem(id: string): Promise<boolean> {
   if (!supabase) return false;
-  await supabase.from('lost_items').delete().eq('id', id);
-  return true;
+  const { error } = await supabase.from('lost_items').delete().eq('id', id);
+  return !error;
 }
 
 export async function deleteFoundItem(id: string): Promise<boolean> {
   if (!supabase) return false;
-  await supabase.from('found_items').delete().eq('id', id);
-  return true;
+  const { error } = await supabase.from('found_items').delete().eq('id', id);
+  return !error;
 }
 
 export async function getReportsByBusLine(busLine: string) {

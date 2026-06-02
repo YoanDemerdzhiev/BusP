@@ -2,35 +2,33 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, MapPin, Clock, Phone, PackageSearch } from 'lucide-react';
+import { Search, Plus, MapPin, Clock, Phone, PackageOpen } from 'lucide-react';
 import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
-import NavMenu from '@/components/NavMenu';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { getFoundItems } from '@/lib/db-supabase';
-import { FoundItem } from '@/lib/types';
+import { getLostItems } from '@/lib/db-supabase';
+import { LostItem } from '@/lib/types';
 
 export default function FoundPage() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [foundItems, setFoundItems] = useState<FoundItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<FoundItem | null>(null);
+  const [lostItems, setLostItems] = useState<LostItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<LostItem | null>(null);
   const router = useRouter();
 
-  async function loadFoundItems() {
+  async function loadLostItems() {
     try {
-      const data = await getFoundItems();
-      setFoundItems(data);
+      const data = await getLostItems();
+      setLostItems(data);
     } catch (error) {
-      console.error('Failed to load found items:', error);
+      console.error('Failed to load lost items:', error);
     }
   }
 
   useEffect(() => {
-    loadFoundItems();
+    loadLostItems();
   }, []);
 
-  const filteredItems = foundItems.filter(item => 
+  const filteredItems = lostItems.filter(item => 
     item.itemName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.location?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -41,7 +39,7 @@ export default function FoundPage() {
       <ProtectedRoute>
         <PhoneFrame>
           <Header 
-            title="Намерен предмет" 
+            title="Изгубен предмет" 
             showBack 
             onBackClick={() => setSelectedItem(null)}
           />
@@ -73,10 +71,10 @@ export default function FoundPage() {
                   <Clock className="w-4 h-4" />
                   <span>{selectedItem.date} в {selectedItem.time}</span>
                 </div>
-                {selectedItem.finderPhone && (
+                {selectedItem.reporterPhone && (
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4" />
-                    <span>{selectedItem.finderPhone}</span>
+                    <span>{selectedItem.reporterPhone}</span>
                   </div>
                 )}
               </div>
@@ -87,23 +85,23 @@ export default function FoundPage() {
                 <strong>Автобус {selectedItem.busLine}</strong> - {selectedItem.busRegistration}
               </p>
             </div>
-
-            {selectedItem.finderName && (
-              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
-                <p className="text-sm text-green-600 dark:text-green-300">
-                  <strong>Намерен от:</strong> {selectedItem.finderName}
-                </p>
-              </div>
-            )}
             
-            {selectedItem.finderPhone && (
+            {selectedItem.reporterPhone && (
               <button
-                onClick={() => window.location.href = `tel:${selectedItem.finderPhone}`}
+                onClick={() => window.location.href = `tel:${selectedItem.reporterPhone}`}
                 className="w-full py-4 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
               >
                 Обади се
               </button>
             )}
+
+            <button
+              onClick={() => router.push(`/found/report?lostItemId=${selectedItem.id}`)}
+              className="w-full py-4 bg-amber-500 text-white font-semibold rounded-xl hover:bg-amber-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <PackageOpen className="w-5 h-5" />
+              Намерих този предмет
+            </button>
           </div>
         </PhoneFrame>
       </ProtectedRoute>
@@ -115,7 +113,7 @@ export default function FoundPage() {
       <PhoneFrame>
         <Header 
           title="Намерено" 
-          onMenuClick={() => setMenuOpen(true)}
+          showBack 
         />
         
         <div className="p-4 space-y-4">
@@ -125,14 +123,14 @@ export default function FoundPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Търси намерени предмети..."
+              placeholder="Търси изгубени предмети..."
               className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
             />
           </div>
           
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">
             <div className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-              Намерени предмети ({filteredItems.length})
+              Изгубени предмети ({filteredItems.length})
             </div>
             
             {filteredItems.map((item) => (
@@ -149,8 +147,8 @@ export default function FoundPage() {
                       className="w-16 h-16 object-cover rounded-lg"
                     />
                   ) : (
-                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                      <PackageSearch className="w-6 h-6 text-green-500" />
+                    <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+                      <PackageOpen className="w-6 h-6 text-amber-500" />
                     </div>
                   )}
                   <div className="flex-1">
@@ -170,8 +168,8 @@ export default function FoundPage() {
             
             {filteredItems.length === 0 && (
               <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-                <PackageSearch className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Все още няма намерени предмети</p>
+                <PackageOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Все още няма изгубени предмети</p>
               </div>
             )}
           </div>
@@ -186,12 +184,6 @@ export default function FoundPage() {
             Създай сигнал за намерено
           </button>
         </div>
-        
-        <NavMenu 
-          isOpen={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          onSettingsClick={() => setMenuOpen(false)}
-        />
       </PhoneFrame>
     </ProtectedRoute>
   );

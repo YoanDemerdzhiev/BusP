@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, Eye, EyeOff } from 'lucide-react';
-import { loginAdmin, getAdminToken } from '@/lib/admin-api';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
@@ -12,6 +12,7 @@ export default function AdminLoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAdminAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,9 +26,13 @@ export default function AdminLoginPage() {
     setIsLoading(true);
     
     try {
-      await loginAdmin(email, password);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      router.push('/admin/dashboard');
+      const result = await login(email, password);
+      if (result.success) {
+        router.push('/admin/dashboard');
+      } else {
+        setError(result.error || 'Login failed');
+        setIsLoading(false);
+      }
     } catch (err: any) {
       setError(err.message || 'Login failed');
       setIsLoading(false);

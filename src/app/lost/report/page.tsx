@@ -7,17 +7,15 @@ import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
-import { BUS_LINES_PLOVDIV } from '@/lib/types';
-import { createLostItem } from '@/lib/data';
+import { createLostItem } from '@/lib/db-supabase';
 import { LostItem } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
 function ReportForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const busLine = searchParams.get('line') || '';
   const { user } = useAuth();
-  const busLineParam = searchParams.get('line') || '';
-  const busLineInfo = BUS_LINES_PLOVDIV.find(l => l.line === busLineParam);
 
   const [itemName, setItemName] = useState('');
   const [busRegistration, setBusRegistration] = useState('');
@@ -26,7 +24,7 @@ function ReportForm() {
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
-  const [reporterName, setReporterName] = useState(user?.firstName + ' ' + user?.lastName || '');
+  const [reporterName, setReporterName] = useState('');
   const [reporterPhone, setReporterPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -47,18 +45,18 @@ function ReportForm() {
     e.preventDefault();
     setError('');
 
-    if (!itemName || !date || !location || !reporterPhone) {
+    if (!itemName || !date || !location) {
       setError('Моля, попълнете задължителните полета');
       return;
     }
 
     setIsSubmitting(true);
 
-    const item: LostItem = {
+    const lostItem: LostItem = {
       id: uuidv4(),
       userId: user?.id || '',
       itemName,
-      busLine: busLineParam || 'N/A',
+      busLine,
       busRegistration,
       date,
       time,
@@ -71,15 +69,18 @@ function ReportForm() {
       createdAt: new Date().toISOString(),
     };
 
-    setTimeout(() => {
-      createLostItem(item);
+    try {
+      await createLostItem(lostItem);
       setSuccess(true);
       setIsSubmitting(false);
       
       setTimeout(() => {
         router.push('/lost');
       }, 2000);
-    }, 1000);
+    } catch (err: any) {
+      setError(err.message || 'Възникна грешка');
+      setIsSubmitting(false);
+    }
   };
 
   if (success) {
@@ -91,23 +92,23 @@ function ReportForm() {
             <CheckCircle className="w-10 h-10 text-green-500" />
           </div>
           <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
-            Сигналът е изпратен!
+            Предметът е обявен!
           </h2>
           <p className="text-slate-500 dark:text-slate-400 text-center mb-8">
-            Ще се свържем с вас, ако някой подаде информация за вашия предмет.
+            Надяваме се, че скоро ще бъде намерен.
           </p>
           <div className="w-full space-y-3">
             <button
-              onClick={() => router.push('/home')}
+              onClick={() => router.push('/lost')}
               className="w-full py-4 bg-blue-500 text-white font-semibold rounded-xl hover:bg-blue-600 transition-colors"
             >
-              Към начална страница
+              Към изгубени предмети
             </button>
             <button
-              onClick={() => router.push('/reports')}
+              onClick={() => router.push('/home')}
               className="w-full py-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
             >
-              Моите сигнали
+              Към начална страница
             </button>
           </div>
         </div>
@@ -117,24 +118,18 @@ function ReportForm() {
 
   return (
     <PhoneFrame>
-      <Header title="Създай сигнал" showBack />
+      <Header title={`Изгубено - ${busLine}`} showBack />
       
       <form onSubmit={handleSubmit} className="flex-1 p-4 overflow-y-auto pb-20 space-y-4">
-        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4">
-          <p className="text-sm text-amber-700 dark:text-amber-300">
-            <strong>Автобус {busLineParam}</strong> {busLineInfo ? `- ${busLineInfo.route}` : ''}
-          </p>
-        </div>
-
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Изгубен предмет *
+            Име на предмета *
           </label>
           <input
             type="text"
             value={itemName}
             onChange={(e) => setItemName(e.target.value)}
-            placeholder="Опишете предмета"
+            placeholder="Какво изгубихте?"
             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
           />
         </div>
@@ -185,7 +180,7 @@ function ReportForm() {
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="Къде загубихте предмета?"
+            placeholder="Къде се случи?"
             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
           />
         </div>
@@ -198,16 +193,16 @@ function ReportForm() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Подробно описание..."
-            rows={3}
+            rows={4}
             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 resize-none"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Снимка
+            Качи снимка
           </label>
-          <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
+          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
             {photo ? (
               <div className="relative w-full h-full">
                 <img src={photo} alt="Preview" className="w-full h-full object-cover rounded-xl" />
@@ -221,8 +216,8 @@ function ReportForm() {
               </div>
             ) : (
               <>
-                <Camera className="w-6 h-6 text-slate-400 mb-1" />
-                <span className="text-xs text-slate-500">Прикачете снимка</span>
+                <Camera className="w-8 h-8 text-slate-400 mb-2" />
+                <span className="text-sm text-slate-500">Натиснете за да качите снимка</span>
               </>
             )}
             <input
@@ -234,33 +229,21 @@ function ReportForm() {
           </label>
         </div>
 
-        <div className="border-t border-slate-200 dark:border-slate-600 pt-4 space-y-4">
-          <h3 className="font-medium text-slate-700 dark:text-slate-300">Ваши данни за контакт</h3>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Име *
-            </label>
-            <input
-              type="text"
-              value={reporterName}
-              onChange={(e) => setReporterName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Телефонен номер *
-            </label>
-            <input
-              type="tel"
-              value={reporterPhone}
-              onChange={(e) => setReporterPhone(e.target.value)}
-              placeholder="0888 123 456"
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
-            />
-          </div>
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={reporterName}
+            onChange={(e) => setReporterName(e.target.value)}
+            placeholder="Вашето име (по избор)"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
+          />
+          <input
+            type="tel"
+            value={reporterPhone}
+            onChange={(e) => setReporterPhone(e.target.value)}
+            placeholder="Вашият телефон (задължително)"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
+          />
         </div>
 
         {error && (
@@ -278,7 +261,7 @@ function ReportForm() {
               Изпращане...
             </span>
           ) : (
-            'Изпрати'
+            'Обяви изгубен предмет'
           )}
         </button>
       </form>
@@ -291,9 +274,8 @@ export default function LostReportPage() {
     <ProtectedRoute>
       <Suspense fallback={
         <PhoneFrame>
-          <Header title="Създай сигнал" showBack />
           <div className="flex-1 flex items-center justify-center">
-            <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         </PhoneFrame>
       }>

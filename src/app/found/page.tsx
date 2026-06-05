@@ -2,29 +2,36 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, MapPin, Clock, Phone } from 'lucide-react';
+import { Search, Plus, MapPin, Clock, Phone, PackageOpen } from 'lucide-react';
 import PhoneFrame from '@/components/PhoneFrame';
 import Header from '@/components/Header';
-import NavMenu from '@/components/NavMenu';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { getLostItems } from '@/lib/db-supabase';
 import { LostItem } from '@/lib/types';
-import { getLostItems } from '@/lib/data';
 
 export default function FoundPage() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [lostItems, setLostItems] = useState<LostItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<LostItem | null>(null);
   const router = useRouter();
 
+  async function loadLostItems() {
+    try {
+      const data = await getLostItems();
+      setLostItems(data);
+    } catch (error) {
+      console.error('Failed to load lost items:', error);
+    }
+  }
+
   useEffect(() => {
-    setLostItems(getLostItems());
+    loadLostItems();
   }, []);
 
   const filteredItems = lostItems.filter(item => 
-    item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.location.toLowerCase().includes(searchQuery.toLowerCase())
+    item.itemName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.location?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (selectedItem) {
@@ -34,6 +41,7 @@ export default function FoundPage() {
           <Header 
             title="Изгубен предмет" 
             showBack 
+            onBackClick={() => setSelectedItem(null)}
           />
           
           <div className="p-4 space-y-4">
@@ -63,24 +71,36 @@ export default function FoundPage() {
                   <Clock className="w-4 h-4" />
                   <span>{selectedItem.date} в {selectedItem.time}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
-                  <span>{selectedItem.reporterPhone}</span>
-                </div>
+                {selectedItem.reporterPhone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    <span>{selectedItem.reporterPhone}</span>
+                  </div>
+                )}
               </div>
             </div>
             
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
-              <p className="text-sm text-green-600 dark:text-green-300">
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4">
+              <p className="text-sm text-blue-600 dark:text-blue-300">
                 <strong>Автобус {selectedItem.busLine}</strong> - {selectedItem.busRegistration}
               </p>
             </div>
             
+            {selectedItem.reporterPhone && (
+              <button
+                onClick={() => window.location.href = `tel:${selectedItem.reporterPhone}`}
+                className="w-full py-4 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
+              >
+                Обади се
+              </button>
+            )}
+
             <button
-              onClick={() => window.location.href = `tel:${selectedItem.reporterPhone}`}
-              className="w-full py-4 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
+              onClick={() => router.push(`/found/report?lostItemId=${selectedItem.id}`)}
+              className="w-full py-4 bg-amber-500 text-white font-semibold rounded-xl hover:bg-amber-600 transition-colors flex items-center justify-center gap-2"
             >
-              Обади се
+              <PackageOpen className="w-5 h-5" />
+              Намерих този предмет
             </button>
           </div>
         </PhoneFrame>
@@ -93,8 +113,7 @@ export default function FoundPage() {
       <PhoneFrame>
         <Header 
           title="Намерено" 
-          showBack
-          onMenuClick={() => setMenuOpen(true)}
+          showBack 
         />
         
         <div className="p-4 space-y-4">
@@ -104,7 +123,7 @@ export default function FoundPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Търси предмети..."
+              placeholder="Търси изгубени предмети..."
               className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
             />
           </div>
@@ -128,8 +147,8 @@ export default function FoundPage() {
                       className="w-16 h-16 object-cover rounded-lg"
                     />
                   ) : (
-                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                      <span className="text-2xl">📦</span>
+                    <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+                      <PackageOpen className="w-6 h-6 text-amber-500" />
                     </div>
                   )}
                   <div className="flex-1">
@@ -149,7 +168,7 @@ export default function FoundPage() {
             
             {filteredItems.length === 0 && (
               <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-                <p className="text-4xl mb-2">🔍</p>
+                <PackageOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>Все още няма изгубени предмети</p>
               </div>
             )}
@@ -162,15 +181,9 @@ export default function FoundPage() {
             className="w-full py-4 bg-green-500 text-white font-semibold rounded-xl shadow-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
           >
             <Plus className="w-5 h-5" />
-            Създай сигнал
+            Създай сигнал за намерено
           </button>
         </div>
-        
-        <NavMenu 
-          isOpen={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          onSettingsClick={() => setMenuOpen(false)}
-        />
       </PhoneFrame>
     </ProtectedRoute>
   );

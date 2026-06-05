@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import { 
   FileText, 
   Filter, 
-  Search, 
   Check, 
   Trash2,
   Eye,
@@ -13,13 +12,13 @@ import {
   Clock,
   MapPin,
   Phone,
-  Bus,
   AlertTriangle,
   Package,
   CheckCircle
 } from 'lucide-react';
-import { getAllReports, getResolvedReports, resolveReport, deleteReport } from '@/lib/admin-api';
 import { BUS_LINES_PLOVDIV } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 interface Report {
   id: string;
@@ -42,69 +41,98 @@ interface Report {
 }
 
 export default function AdminReportsPage() {
+  const { logout: adminLogout } = useAdminAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [resolvedReports, setResolvedReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'resolved'>('active');
   const [showFilters, setShowFilters] = useState(false);
-  
+
   const [filters, setFilters] = useState({
     type: '',
     busLine: '',
     date: '',
   });
-  
+
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    loadReports();
-  }, [activeTab, filters]);
-
-  const loadReports = async () => {
+  async function loadReports() {
     setIsLoading(true);
     try {
+      const params = new URLSearchParams();
+      if (filters.type) params.set('type', filters.type);
+      if (filters.busLine) params.set('busLine', filters.busLine);
+      if (filters.date) params.set('date', filters.date);
+      if (activeTab === 'resolved') params.set('status', 'resolved');
+
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const session = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = session.data.session?.access_token;
+      const response = await fetch(`/api/admin/reports${query}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          console.error('Admin session expired, logging out');
+          adminLogout();
+          return;
+        }
+        console.error('API error:', response.status, response.statusText);
+        return;
+      }
+
+      const data = await response.json();
+
       if (activeTab === 'resolved') {
-        const data = await getResolvedReports();
-        setReports(data.reports);
-        setResolvedReports(data.reports);
+        setReports(data.reports || []);
+        setResolvedReports(data.reports || []);
       } else {
-        const data = await getAllReports();
-        let filtered = data.reports;
-        
-        if (filters.type) {
-          filtered = filtered.filter((r: any) => r.reportType === filters.type);
-        }
-        if (filters.busLine) {
-          filtered = filtered.filter((r: any) => r.busLine === filters.busLine);
-        }
-        if (filters.date) {
-          filtered = filtered.filter((r: any) => r.date === filters.date);
-        }
-        
-        setReports(filtered);
+        setReports(data.reports || []);
       }
     } catch (error) {
       console.error('Failed to load reports:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    loadReports();
+  }, [activeTab, filters]);
 
   const handleResolve = async (report: Report) => {
     setIsResolving(true);
     try {
-      await resolveReport({
-        type: report.reportType,
-        id: report.id,
+      const session = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = session.data.session?.access_token;
+      const response = await fetch('/api/admin/reports', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ type: report.reportType, id: report.id }),
       });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          adminLogout();
+          return;
+        }
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to resolve report');
+      }
+
       setShowDetail(false);
       setSelectedReport(null);
       loadReports();
     } catch (error) {
       console.error('Failed to resolve report:', error);
+      alert('Failed to resolve report: ' + (error as Error).message);
     } finally {
       setIsResolving(false);
     }
@@ -112,15 +140,31 @@ export default function AdminReportsPage() {
 
   const handleDelete = async (report: Report) => {
     if (!confirm('Are you sure you want to delete this report?')) return;
-    
+
     setIsDeleting(true);
     try {
-      await deleteReport(report.id, report.reportType);
+      const session = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = session.data.session?.access_token;
+      const response = await fetch(`/api/admin/reports/delete?id=${report.id}&type=${report.reportType}`, {
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          adminLogout();
+          return;
+        }
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete report');
+      }
+
       setShowDetail(false);
       setSelectedReport(null);
       loadReports();
     } catch (error) {
       console.error('Failed to delete report:', error);
+      alert('Failed to delete report: ' + (error as Error).message);
     } finally {
       setIsDeleting(false);
     }
@@ -163,7 +207,7 @@ export default function AdminReportsPage() {
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            Active ({reports.length})
+            Active ({reports.length > 0 && activeTab === 'active' ? reports.length : 0})
           </button>
           <button
             onClick={() => setActiveTab('resolved')}
@@ -176,7 +220,7 @@ export default function AdminReportsPage() {
             Resolved ({resolvedReports.length})
           </button>
         </div>
-        
+
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
@@ -194,9 +238,7 @@ export default function AdminReportsPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
           <div className="grid grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Type
-              </label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
               <select
                 value={filters.type}
                 onChange={(e) => setFilters({ ...filters, type: e.target.value })}
@@ -209,9 +251,7 @@ export default function AdminReportsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Bus Line
-              </label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Bus Line</label>
               <select
                 value={filters.busLine}
                 onChange={(e) => setFilters({ ...filters, busLine: e.target.value })}
@@ -219,16 +259,12 @@ export default function AdminReportsPage() {
               >
                 <option value="">All Lines</option>
                 {BUS_LINES_PLOVDIV.map((line) => (
-                  <option key={line.line} value={line.line}>
-                    Line {line.line}
-                  </option>
+                  <option key={line.line} value={line.line}>Line {line.line}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Date
-              </label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
               <input
                 type="date"
                 value={filters.date}
@@ -372,7 +408,7 @@ export default function AdminReportsPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="p-4 space-y-4">
               {selectedReport.photoUrl && (
                 <div className="rounded-lg overflow-hidden bg-slate-100">
@@ -383,7 +419,7 @@ export default function AdminReportsPage() {
                   />
                 </div>
               )}
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-50 rounded-lg">
                   <p className="text-xs text-slate-500 mb-1">Bus Line</p>
@@ -394,12 +430,12 @@ export default function AdminReportsPage() {
                   <p className="font-medium text-slate-800">{selectedReport.busRegistration || 'N/A'}</p>
                 </div>
               </div>
-              
+
               <div className="p-3 bg-slate-50 rounded-lg">
                 <p className="text-xs text-slate-500 mb-1">Description</p>
                 <p className="text-slate-800">{selectedReport.description || 'No description'}</p>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-2 text-slate-600">
                   <Clock className="w-4 h-4" />
@@ -410,7 +446,7 @@ export default function AdminReportsPage() {
                   <span>{selectedReport.location}</span>
                 </div>
               </div>
-              
+
               {!selectedReport.isAnonymous && (
                 <div className="border-t border-slate-200 pt-4">
                   <p className="text-sm font-medium text-slate-700 mb-2">Reporter Info</p>
@@ -448,14 +484,14 @@ export default function AdminReportsPage() {
                   </div>
                 </div>
               )}
-              
+
               {selectedReport.isAnonymous && (
                 <div className="p-3 bg-slate-50 rounded-lg text-slate-500 text-center">
                   This is an anonymous report - no reporter information available
                 </div>
               )}
             </div>
-            
+
             {activeTab === 'active' && (
               <div className="flex gap-3 p-4 border-t border-slate-200">
                 <button

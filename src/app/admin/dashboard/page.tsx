@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { 
   FileText, 
   AlertTriangle, 
@@ -11,7 +10,8 @@ import {
   MapPin
 } from 'lucide-react';
 import Link from 'next/link';
-import { getAllReports, getResolvedReports } from '@/lib/admin-api';
+import { supabase } from '@/lib/supabase';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 interface Stats {
   problems: number;
@@ -33,6 +33,7 @@ interface RecentReport {
 }
 
 export default function AdminDashboardPage() {
+  const { logout: adminLogout } = useAdminAuth();
   const [stats, setStats] = useState<Stats>({
     problems: 0,
     lost: 0,
@@ -43,34 +44,52 @@ export default function AdminDashboardPage() {
   const [recentReports, setRecentReports] = useState<RecentReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  async function loadDashboardData() {
     try {
-      const reportsData = await getAllReports();
-      const resolvedData = await getResolvedReports();
-      
-      const problems = reportsData.reports.filter((r: any) => r.reportType === 'problem').length;
-      const lost = reportsData.reports.filter((r: any) => r.reportType === 'lost').length;
-      const found = reportsData.reports.filter((r: any) => r.reportType === 'found').length;
-      
+      const session = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = session.data.session?.access_token;
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : undefined;
+
+      const [activeRes, resolvedRes] = await Promise.all([
+        fetch('/api/admin/reports', { headers }),
+        fetch('/api/admin/reports?status=resolved', { headers }),
+      ]);
+
+      if (!activeRes.ok) {
+        if (activeRes.status === 403) { adminLogout(); return; }
+        throw new Error('Failed to fetch active reports');
+      }
+      if (!resolvedRes.ok) {
+        if (resolvedRes.status === 403) { adminLogout(); return; }
+        throw new Error('Failed to fetch resolved reports');
+      }
+
+      const reportsData = await activeRes.json();
+      const resolvedData = await resolvedRes.json();
+
+      const problems = (reportsData.reports || []).filter((r: any) => r.reportType === 'problem').length;
+      const lost = (reportsData.reports || []).filter((r: any) => r.reportType === 'lost').length;
+      const found = (reportsData.reports || []).filter((r: any) => r.reportType === 'found').length;
+
       setStats({
         problems,
         lost,
         found,
-        total: reportsData.total,
-        resolved: resolvedData.total,
+        total: reportsData.total ?? 0,
+        resolved: resolvedData.total ?? 0,
       });
-      
-      setRecentReports(reportsData.reports.slice(0, 5));
+
+      setRecentReports((reportsData.reports || []).slice(0, 5));
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
   const statCards = [
     { 
@@ -158,7 +177,7 @@ export default function AdminDashboardPage() {
             View All →
           </Link>
         </div>
-        
+
         {recentReports.length === 0 ? (
           <div className="p-8 text-center text-slate-500">
             No reports yet

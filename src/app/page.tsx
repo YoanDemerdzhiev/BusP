@@ -1,22 +1,31 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function Home() {
+export default function RootPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    if (isLoading) return;
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient || isLoading) return;
     
-    if (user) {
-      router.replace('/home');
-    } else {
-      router.replace('/login');
-    }
-  }, [user, isLoading, router]);
+    const timer = setTimeout(() => {
+      if (user) {
+        router.push('/home');
+      } else {
+        router.push('/login');
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [isClient, isLoading, user, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">

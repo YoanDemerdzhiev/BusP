@@ -39,15 +39,13 @@ export default function RegisterPage() {
     
     setIsLoading(true);
     
-    setTimeout(() => {
-      const result = register(email, password, firstName, lastName);
-      if (result.success) {
-        router.push('/home');
-      } else {
-        setError(result.error || 'Възникна грешка');
-      }
-      setIsLoading(false);
-    }, 500);
+    const result = await register(email, password, firstName, lastName);
+    if (result.success) {
+      router.push('/home');
+    } else {
+      setError(result.error || 'Възникна грешка');
+    }
+    setIsLoading(false);
   };
 
   return (

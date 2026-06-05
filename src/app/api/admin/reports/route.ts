@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllReports, getAllProblems, getAllLostItems, getAllFoundItems, getResolvedReports, deleteProblem, deleteLostItem, deleteFoundItem, addResolvedReport } from '@/lib/data';
-import { v4 as uuidv4 } from 'uuid';
+import { getAdminClient } from '@/lib/supabase';
+import { verifyAdminRequest } from '@/lib/admin-auth';
 
 export async function GET(request: NextRequest) {
+  const auth = await verifyAdminRequest(request);
+  if (auth instanceof Response) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
@@ -10,147 +13,94 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date');
     const status = searchParams.get('status');
 
-    let reports: any[] = [];
-    let total = 0;
-    let resolved: any[] = [];
-
     if (status === 'resolved') {
-      resolved = getResolvedReports();
-      
-      if (type) {
-        resolved = resolved.filter(r => r.type === type);
-      }
-      if (busLine) {
-        resolved = resolved.filter(r => r.busLine === busLine);
-      }
-      if (date) {
-        resolved = resolved.filter(r => r.date === date);
-      }
-      
-      return NextResponse.json({
-        reports: resolved,
-        total: resolved.length,
-        status: 'resolved',
-      });
+      const client = getAdminClient();
+      const query = client.from('resolved_reports').select('*').order('resolved_at', { ascending: false });
+
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+
+      let filtered: any[] = data || [];
+      if (type) filtered = filtered.filter((r: any) => r.type === type);
+      if (busLine) filtered = filtered.filter((r: any) => r.bus_line_id?.toString() === busLine);
+      if (date) filtered = filtered.filter((r: any) => r.date === date);
+
+      return NextResponse.json({ reports: filtered, total: filtered.length, status: 'resolved' });
     }
 
-    if (type === 'problem' || !type) {
-      const problems = getAllProblems();
-      reports = [...reports, ...problems.map(p => ({ ...p, reportType: 'problem' }))];
-    }
-    if (type === 'lost' || !type) {
-      const lostItems = getAllLostItems();
-      reports = [...reports, ...lostItems.map(l => ({ ...l, reportType: 'lost' }))];
-    }
-    if (type === 'found' || !type) {
-      const foundItems = getAllFoundItems();
-      reports = [...reports, ...foundItems.map(f => ({ ...f, reportType: 'found' }))];
+    const client = getAdminClient();
+    const { data: problems, error: probError } = await client.from('problems').select('*').order('created_at', { ascending: false });
+    const { data: lostItems, error: lostError } = await client.from('lost_items').select('*').order('created_at', { ascending: false });
+    const { data: foundItems, error: foundError } = await client.from('found_items').select('*').order('created_at', { ascending: false });
+
+    if (probError || lostError || foundError) {
+      throw new Error(probError?.message || lostError?.message || foundError?.message);
     }
 
-    if (type === 'problem' || !type) {
-      total += getAllProblems().length;
-    }
-    if (type === 'lost' || !type) {
-      total += getAllLostItems().length;
-    }
-    if (type === 'found' || !type) {
-      total += getAllFoundItems().length;
-    }
+    let reports = [
+      ...(problems || []).map((r: any) => ({ ...r, reportType: 'problem', isAnonymous: r.is_anonymous })),
+      ...(lostItems || []).map((r: any) => ({ ...r, reportType: 'lost', isAnonymous: false })),
+      ...(foundItems || []).map((r: any) => ({ ...r, reportType: 'found', isAnonymous: false })),
+    ];
 
-    if (busLine) {
-      reports = reports.filter(r => r.busLine === busLine);
-    }
+    if (type) reports = reports.filter((r: any) => r.reportType === type);
+    if (busLine) reports = reports.filter((r: any) => r.bus_line_id?.toString() === busLine);
+    if (date) reports = reports.filter((r: any) => r.date === date);
 
-    if (date) {
-      reports = reports.filter(r => r.date === date);
-    }
-
-    reports.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    return NextResponse.json({
-      reports,
-      total: reports.length,
-      status: 'active',
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ reports, total: reports.length, status: 'active' });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdminRequest(request);
+  if (auth instanceof Response) return auth;
+
   try {
     const body = await request.json();
-    const { type, id, adminId, adminName } = body;
+    const { type, id } = body;
 
     if (!type || !id) {
-      return NextResponse.json(
-        { error: 'Type and ID are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Type and ID are required' }, { status: 400 });
     }
 
-    let originalReport: any;
+    const adminClient = getAdminClient();
+    const tableName = type === 'problem' ? 'problems' : type === 'lost' ? 'lost_items' : 'found_items';
 
-    if (type === 'problem') {
-      originalReport = getAllProblems().find(p => p.id === id);
-    } else if (type === 'lost') {
-      originalReport = getAllLostItems().find(l => l.id === id);
-    } else if (type === 'found') {
-      originalReport = getAllFoundItems().find(f => f.id === id);
+    const { data: original, error: fetchError } = await adminClient.from(tableName).select('*').eq('id', id).single();
+    if (fetchError || !original) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
-    if (!originalReport) {
-      return NextResponse.json(
-        { error: 'Report not found' },
-        { status: 404 }
-      );
-    }
-
-    const resolvedReport = {
-      id: uuidv4(),
-      originalId: originalReport.id,
+    const { error: insertError } = await adminClient.from('resolved_reports').insert({
+      original_id: original.id,
       type,
-      title: originalReport.title || originalReport.itemName || '',
-      itemName: originalReport.itemName,
-      description: originalReport.description,
-      busLine: originalReport.busLine,
-      busRegistration: originalReport.busRegistration,
-      date: originalReport.date,
-      time: originalReport.time,
-      location: originalReport.location,
-      photoUrl: originalReport.photoUrl,
-      isAnonymous: originalReport.isAnonymous,
-      reporterName: originalReport.reporterName,
-      reporterPhone: originalReport.reporterPhone,
-      finderName: originalReport.finderName,
-      finderPhone: originalReport.finderPhone,
-      status: 'resolved',
-      resolvedAt: new Date().toISOString(),
-      resolvedBy: adminName || adminId || 'Admin',
-    };
-
-    addResolvedReport(resolvedReport);
-
-    if (type === 'problem') {
-      deleteProblem(id);
-    } else if (type === 'lost') {
-      deleteLostItem(id);
-    } else if (type === 'found') {
-      deleteFoundItem(id);
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Report resolved and moved to resolved list',
-      resolvedReport,
+      title: original.title,
+      description: original.description,
+      bus_line_id: original.bus_line_id,
+      bus_registration: original.bus_registration,
+      date: original.date,
+      time: original.time,
+      location: original.location,
+      image_url: original.image_url,
+      is_anonymous: original.is_anonymous,
+      user_id: original.user_id,
+      contact_name: original.reporter_name || original.finder_name,
+      contact_phone: original.reporter_phone || original.finder_phone,
+      resolved_at: new Date().toISOString(),
     });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+
+    if (insertError) throw new Error(insertError.message);
+
+    const { error: deleteError } = await adminClient.from(tableName).delete().eq('id', id);
+    if (deleteError) throw new Error(deleteError.message);
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    if (error.message === 'Report not found') {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    }
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }
